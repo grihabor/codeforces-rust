@@ -10,32 +10,25 @@ struct StateGenerator {
 }
 
 trait Increment {
-    fn inc(&mut self) -> Option<()>;
+    fn inc(self) -> Option<Self> where Self: std::marker::Sized;
 }
 
-impl Increment for [bool] {
-    fn inc(&mut self) -> Option<()> {
-        if self.len() == 0 {
-        	println!("None! {:?}", self);
-            return None
-        }
-        match self[0] {
-            true => {
-                self[0] = false;
-                self[1..].inc()
-            }
-            false => {
-                self[0] = true;
-                Some(())
-            }
-        }
+fn _inc_state(mut state: State, idx: usize) -> Option<State> {
+	if idx >= state.len() {
+        return None
     }
+    state[idx] = !state[idx];
+    if !state[idx] {
+    	_inc_state(state, idx + 1)
+    } else {
+	    Some(state)
+	}
 }
 
 impl Increment for State {
-    fn inc(&mut self) -> Option<()> {
-    	(&mut self[..]).inc()
-    }
+	fn inc(self) -> Option<State> {
+		_inc_state(self, 0)
+	}
 }
 
 impl StateGenerator {
@@ -50,9 +43,8 @@ impl Iterator for StateGenerator {
     type Item = State;
     fn next(&mut self) -> Option<Self::Item> {
         let cloned_v = self.v.clone();
-        let next_value = cloned_v.map(|mut value| {
-        	value.inc();
-        	value
+        let next_value = cloned_v.and_then(|value| {
+        	value.inc()
         });
         std::mem::replace(&mut self.v, next_value)
     }
