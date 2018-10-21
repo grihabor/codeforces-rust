@@ -72,8 +72,8 @@ impl Components for State {
     fn n_components(&self) -> usize {
     	let half = self.len() / 2;
     	let columns = self[..half].iter().zip(self[half..].iter());
-        for (first, second) in columns {
-        	println!("{} {}", first, second);
+        for (first, second) in columns.clone().zip(columns.skip(1)) {
+        	println!("{:?} {:?}", first, second);
         }
         0
     }
