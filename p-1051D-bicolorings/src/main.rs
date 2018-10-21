@@ -105,6 +105,16 @@ impl Components for State {
     }
 }
 
+trait CustomDisplay {
+	fn display(&self) -> String;
+}
+
+impl CustomDisplay for State {
+	fn display(&self) -> String {
+		format!("{:?}", self)
+	}
+}
+
 impl Iterator for Grid {
     type Item = State;
     fn next(&mut self) -> Option<Self::Item> {
@@ -112,7 +122,7 @@ impl Iterator for Grid {
         // In newer versions replace the code with Option::filter
         //
         while let Some(state) = self.iterator.next() {
-        	println!("{:?} -> {}", state, state.n_components());
+        	println!("{} -> {}", state.display(), state.n_components());
             if state.n_components() == self.n_components {
                 return Some(state)
             }
