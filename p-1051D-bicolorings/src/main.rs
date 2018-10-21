@@ -72,10 +72,26 @@ impl Components for State {
     fn n_components(&self) -> usize {
     	let half = self.len() / 2;
     	let columns = self[..half].iter().zip(self[half..].iter());
-        for (first, second) in columns.clone().zip(columns.skip(1)) {
-        	println!("{:?} {:?}", first, second);
+    	let opt = columns.clone().next();
+    	if let None = opt {
+    		return 0
+    	} 
+    	let first = opt.unwrap();
+
+    	let mut count = if first.0 != first.1 {2} else {1};
+
+        for (prev, cur) in columns.clone().zip(columns.skip(1)) {
+        	count = match (cur.0 == prev.0, cur.1 == prev.1, cur.0 == cur.1) {
+        		( true,  true,     _) => count,
+        		( true, false,  true) => count,
+        		(false,  true,  true) => count,
+        		( true, false, false) => count + 1,
+        		(false,  true, false) => count + 1,
+        		(false, false,  true) => count + 1,
+        		(false, false, false) => count + 2,
+        	}
         }
-        0
+        count
     }
 }
 
@@ -86,7 +102,7 @@ impl Iterator for Grid {
         // In newer versions replace the code with Option::filter
         //
         while let Some(state) = self.iterator.next() {
-        	println!("{:?}", state);
+        	println!("{:?} -> {}", state, state.n_components());
             if state.n_components() == self.n_components {
                 return Some(state)
             }
