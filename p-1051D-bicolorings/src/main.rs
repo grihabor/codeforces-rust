@@ -64,14 +64,24 @@ impl Grid {
     }
 }
 
+trait Columns<'a> {
+	fn columns(&'a self) -> std::iter::Zip<std::slice::Iter<'a, bool>, std::slice::Iter<'a, bool>>;
+}
+
+impl<'a> Columns<'a> for State {
+	fn columns(&'a self) -> std::iter::Zip<std::slice::Iter<'a, bool>, std::slice::Iter<'a, bool>> {
+		let half = self.len() / 2;
+		self[..half].iter().zip(self[half..].iter())
+	}
+}
+
 trait Components {
     fn n_components(&self) -> usize;
 }
 
 impl Components for State {
     fn n_components(&self) -> usize {
-    	let half = self.len() / 2;
-    	let columns = self[..half].iter().zip(self[half..].iter());
+    	let columns = self.columns();
     	let opt = columns.clone().next();
     	if let None = opt {
     		return 0
