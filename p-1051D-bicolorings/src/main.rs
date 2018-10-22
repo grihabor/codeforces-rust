@@ -64,14 +64,25 @@ impl Grid {
     }
 }
 
+type Row<'a> = std::slice::Iter<'a, bool>;
+
 trait Columns<'a> {
-	fn columns(&'a self) -> std::iter::Zip<std::slice::Iter<'a, bool>, std::slice::Iter<'a, bool>>;
+	fn first_row(&'a self) -> Row<'a>;
+	fn last_row(&'a self) -> Row<'a>;
+	fn columns(&'a self) -> std::iter::Zip<Row<'a>, Row<'a>>;
 }
 
 impl<'a> Columns<'a> for State {
-	fn columns(&'a self) -> std::iter::Zip<std::slice::Iter<'a, bool>, std::slice::Iter<'a, bool>> {
+	fn first_row(&'a self) -> Row<'a> {
 		let half = self.len() / 2;
-		self[..half].iter().zip(self[half..].iter())
+		self[..half].iter()
+	}
+	fn last_row(&'a self) -> Row<'a> {
+		let half = self.len() / 2;
+		self[half..].iter()
+	}
+	fn columns(&'a self) -> std::iter::Zip<Row<'a>, Row<'a>> {
+		self.first_row().zip(self.last_row())
 	}
 }
 
