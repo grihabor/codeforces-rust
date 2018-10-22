@@ -120,9 +120,18 @@ trait CustomDisplay {
 	fn display(&self) -> String;
 }
 
+fn into(row: Row) -> Vec<u8> {
+	row.map(|item| match item {&true => 1u8, &false => 0u8}).collect()
+}
+
 impl CustomDisplay for State {
 	fn display(&self) -> String {
-		format!("{:?}", self)
+
+		format!(
+			"[{:?}\n {:?}]", 
+			into(self.first_row()),
+			into(self.last_row().into()),
+		)	
 	}
 }
 
@@ -133,7 +142,7 @@ impl Iterator for Grid {
         // In newer versions replace the code with Option::filter
         //
         while let Some(state) = self.iterator.next() {
-        	println!("{} -> {}", state.display(), state.n_components());
+        	// println!("{} -> {}", state.display(), state.n_components());
             if state.n_components() == self.n_components {
                 return Some(state)
             }
@@ -167,7 +176,10 @@ fn main() -> () {
 	    eprintln!("DEBUG: {:?}", args);
 	    let grid = Grid::new(args);
 	    for state in grid {
-	        println!("{:?}", state);
+	    	println!("");
+	    	println!("Match");
+	        println!("{}", state.display());
+	        println!("");
 	    }
 	} else {
 		eprintln!("Failed to read arguments, pass 2 integers to the stdin");
