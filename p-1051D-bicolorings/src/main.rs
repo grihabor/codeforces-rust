@@ -173,14 +173,17 @@ fn get_args() -> Result<Args, std::io::Error> {
 
 fn main() -> () {
     if let Ok(args) = get_args() {
-	    eprintln!("DEBUG: {:?}", args);
+	    // eprintln!("DEBUG: {:?}", args);
 	    let grid = Grid::new(args);
+	    /*
 	    for state in grid {
 	    	println!("");
 	    	println!("Match");
 	        println!("{}", state.display());
 	        println!("");
 	    }
+	    */
+	    println!("{}", grid.into_iter().count());
 	} else {
 		eprintln!("Failed to read arguments, pass 2 integers to the stdin");
 	}
