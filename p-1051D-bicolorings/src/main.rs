@@ -1,3 +1,4 @@
+use std::collections::*;
 use std::io::{self, Read};
 use std::{result};
 
@@ -142,7 +143,8 @@ impl Iterator for Grid {
         // In newer versions replace the code with Option::filter
         //
         while let Some(state) = self.iterator.next() {
-        	// println!("{} -> {}", state.display(), state.n_components());
+        	eprintln!("{} -> {}", state.display(), state.n_components());
+        	eprintln!("DEBUG: {}", state.n_components());
             if state.n_components() == self.n_components {
                 return Some(state)
             }
@@ -150,7 +152,7 @@ impl Iterator for Grid {
         None
     }
 }
- 
+
 #[derive(Debug)]
 struct Args {
     n_columns: usize,
@@ -171,20 +173,20 @@ fn get_args() -> Result<Args, std::io::Error> {
     })
 }
 
-fn main() -> () {
+fn answer_slow() -> () {
     if let Ok(args) = get_args() {
-	    // eprintln!("DEBUG: {:?}", args);
 	    let grid = Grid::new(args);
-	    /*
-	    for state in grid {
-	    	println!("");
-	    	println!("Match");
-	        println!("{}", state.display());
-	        println!("");
-	    }
-	    */
 	    println!("{}", grid.into_iter().count());
 	} else {
 		eprintln!("Failed to read arguments, pass 2 integers to the stdin");
+	}
+}
+
+fn main() -> () {
+	for i in 1..10 {
+		println!("{:?}", StateGenerator::new(i).map(|x| x.n_components()).fold(
+			HashMap::new(),
+			|mut acc, x| {*acc.entry(x).or_insert(0) += 1; acc}
+		));
 	}
 }
