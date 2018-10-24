@@ -15,21 +15,21 @@ trait Increment {
 }
 
 fn _inc_state(mut state: State, idx: usize) -> Option<State> {
-	if idx >= state.len() {
+    if idx >= state.len() {
         return None
     }
     state[idx] = !state[idx];
     if !state[idx] {
-    	_inc_state(state, idx + 1)
+        _inc_state(state, idx + 1)
     } else {
-	    Some(state)
-	}
+        Some(state)
+    }
 }
 
 impl Increment for State {
-	fn inc(self) -> Option<State> {
-		_inc_state(self, 0)
-	}
+    fn inc(self) -> Option<State> {
+        _inc_state(self, 0)
+    }
 }
 
 impl StateGenerator {
@@ -45,7 +45,7 @@ impl Iterator for StateGenerator {
     fn next(&mut self) -> Option<Self::Item> {
         let cloned_v = self.v.clone();
         let next_value = cloned_v.and_then(|value| {
-        	value.inc()
+            value.inc()
         });
         std::mem::replace(&mut self.v, next_value)
     }
@@ -68,23 +68,23 @@ impl Grid {
 type Row<'a> = std::slice::Iter<'a, bool>;
 
 trait Columns<'a> {
-	fn first_row(&'a self) -> Row<'a>;
-	fn last_row(&'a self) -> Row<'a>;
-	fn columns(&'a self) -> std::iter::Zip<Row<'a>, Row<'a>>;
+    fn first_row(&'a self) -> Row<'a>;
+    fn last_row(&'a self) -> Row<'a>;
+    fn columns(&'a self) -> std::iter::Zip<Row<'a>, Row<'a>>;
 }
 
 impl<'a> Columns<'a> for State {
-	fn first_row(&'a self) -> Row<'a> {
-		let half = self.len() / 2;
-		self[..half].iter()
-	}
-	fn last_row(&'a self) -> Row<'a> {
-		let half = self.len() / 2;
-		self[half..].iter()
-	}
-	fn columns(&'a self) -> std::iter::Zip<Row<'a>, Row<'a>> {
-		self.first_row().zip(self.last_row())
-	}
+    fn first_row(&'a self) -> Row<'a> {
+        let half = self.len() / 2;
+        self[..half].iter()
+    }
+    fn last_row(&'a self) -> Row<'a> {
+        let half = self.len() / 2;
+        self[half..].iter()
+    }
+    fn columns(&'a self) -> std::iter::Zip<Row<'a>, Row<'a>> {
+        self.first_row().zip(self.last_row())
+    }
 }
 
 trait Components {
@@ -93,47 +93,47 @@ trait Components {
 
 impl Components for State {
     fn n_components(&self) -> usize {
-    	let columns = self.columns();
-    	let opt = columns.clone().next();
-    	if let None = opt {
-    		return 0
-    	} 
-    	let first = opt.unwrap();
+        let columns = self.columns();
+        let opt = columns.clone().next();
+        if let None = opt {
+            return 0
+        } 
+        let first = opt.unwrap();
 
-    	let mut count = if first.0 != first.1 {2} else {1};
+        let mut count = if first.0 != first.1 {2} else {1};
 
         for (prev, cur) in columns.clone().zip(columns.skip(1)) {
-        	count = match (cur.0 == prev.0, cur.1 == prev.1, cur.0 == cur.1) {
-        		( true,  true,     _) => count,
-        		( true, false,  true) => count,
-        		(false,  true,  true) => count,
-        		( true, false, false) => count + 1,
-        		(false,  true, false) => count + 1,
-        		(false, false,  true) => count + 1,
-        		(false, false, false) => count + 2,
-        	}
+            count = match (cur.0 == prev.0, cur.1 == prev.1, cur.0 == cur.1) {
+                ( true,  true,     _) => count,
+                ( true, false,  true) => count,
+                (false,  true,  true) => count,
+                ( true, false, false) => count + 1,
+                (false,  true, false) => count + 1,
+                (false, false,  true) => count + 1,
+                (false, false, false) => count + 2,
+            }
         }
         count
     }
 }
 
 trait CustomDisplay {
-	fn display(&self) -> String;
+    fn display(&self) -> String;
 }
 
 fn into(row: Row) -> Vec<u8> {
-	row.map(|item| match item {&true => 1u8, &false => 0u8}).collect()
+    row.map(|item| match item {&true => 1u8, &false => 0u8}).collect()
 }
 
 impl CustomDisplay for State {
-	fn display(&self) -> String {
+    fn display(&self) -> String {
 
-		format!(
-			"[{:?}\n {:?}]", 
-			into(self.first_row()),
-			into(self.last_row().into()),
-		)	
-	}
+        format!(
+            "[{:?}\n {:?}]", 
+            into(self.first_row()),
+            into(self.last_row().into()),
+        )   
+    }
 }
 
 impl Iterator for Grid {
@@ -143,8 +143,8 @@ impl Iterator for Grid {
         // In newer versions replace the code with Option::filter
         //
         while let Some(state) = self.iterator.next() {
-        	eprintln!("{} -> {}", state.display(), state.n_components());
-        	eprintln!("DEBUG: {}", state.n_components());
+            eprintln!("{} -> {}", state.display(), state.n_components());
+            eprintln!("DEBUG: {}", state.n_components());
             if state.n_components() == self.n_components {
                 return Some(state)
             }
@@ -175,18 +175,60 @@ fn get_args() -> Result<Args, std::io::Error> {
 
 fn answer_slow() -> () {
     if let Ok(args) = get_args() {
-	    let grid = Grid::new(args);
-	    println!("{}", grid.into_iter().count());
-	} else {
-		eprintln!("Failed to read arguments, pass 2 integers to the stdin");
-	}
+        let grid = Grid::new(args);
+        println!("{}", grid.into_iter().count());
+    } else {
+        eprintln!("Failed to read arguments, pass 2 integers to the stdin");
+    }
 }
 
+
+trait Merge {
+    fn merge(&self, other: &Self) -> Self;
+}
+
+struct Birow {
+    head: (bool, bool),
+    tail: (bool, bool),
+
+    /// Mapping from n_components to the count
+    components: HashMap<usize, usize>,
+}
+
+impl Merge for Birow {
+    fn merge(&self, other: &Self) -> Self {
+        let count_diff = match (self.tail, other.head) {
+            ((false, false), ( true,  true)) => 0,
+            (( true,  true), (false, false)) => 0,
+            ((false,  true), (false,  true)) => -2,
+            (( true, false), ( true, false)) => -2,
+            ((false,  true), ( true, false)) => 0,
+            (( true, false), (false,  true)) => 0,
+            _ => -1,
+        };
+        let merged_components = HashMap::new();
+        
+        Birow {
+            head: self.head, 
+            tail: other.tail,
+            components: merged_components,
+        }
+    }
+}
+
+struct BirowPerm {
+    len: usize,
+
+    /// List of all possible Birow instances for the particular len
+    samples: Vec<Birow>,
+}
+
+
 fn main() -> () {
-	for i in 1..10 {
-		println!("{:?}", StateGenerator::new(i).map(|x| x.n_components()).fold(
-			HashMap::new(),
-			|mut acc, x| {*acc.entry(x).or_insert(0) += 1; acc}
-		));
-	}
+    for i in 1..10 {
+        println!("{:?}", StateGenerator::new(i).map(|x| x.n_components()).fold(
+            HashMap::new(),
+            |mut acc, x| {*acc.entry(x).or_insert(0) += 1; acc}
+        ));
+    }
 }
