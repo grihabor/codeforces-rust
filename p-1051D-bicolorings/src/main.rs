@@ -4,6 +4,8 @@ use std::{result};
 
 
 type State = Vec<bool>;
+type ILong = i64;
+type ULong = u64;
 
 #[derive(Debug)]
 struct StateGenerator {
@@ -184,7 +186,7 @@ fn answer_slow() -> () {
 
 
 trait Merge {
-    fn merge(&self, other: &Self) -> Self;
+    fn merge(&self, rhs: &Self) -> Self;
 }
 
 struct Birow {
@@ -192,12 +194,12 @@ struct Birow {
     tail: (bool, bool),
 
     /// Mapping from n_components to the count
-    components: HashMap<usize, usize>,
+    components: HashMap<ULong, ULong>,
 }
 
 impl Merge for Birow {
-    fn merge(&self, other: &Self) -> Self {
-        let count_diff = match (self.tail, other.head) {
+    fn merge(&self, rhs: &Self) -> Self {
+        let shift: ILong = match (self.tail, rhs.head) {
             ((false, false), ( true,  true)) => 0,
             (( true,  true), (false, false)) => 0,
             ((false,  true), (false,  true)) => -2,
@@ -206,11 +208,17 @@ impl Merge for Birow {
             (( true, false), (false,  true)) => 0,
             _ => -1,
         };
-        let merged_components = HashMap::new();
-        
+        let mut merged_components = HashMap::new();
+        for (key, count) in self.components.clone() {
+            for (rhs_key, rhs_count) in rhs.components.clone() {
+                let merged_key = (key + rhs_key) as ILong + shift;
+                let e = merged_components.entry(merged_key as ULong).or_insert(0);
+                *e += count * rhs_count;
+            }
+        }
         Birow {
             head: self.head, 
-            tail: other.tail,
+            tail: rhs.tail,
             components: merged_components,
         }
     }
@@ -222,7 +230,6 @@ struct BirowPerm {
     /// List of all possible Birow instances for the particular len
     samples: Vec<Birow>,
 }
-
 
 fn main() -> () {
     for i in 1..10 {
