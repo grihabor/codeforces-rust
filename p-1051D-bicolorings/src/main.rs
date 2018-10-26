@@ -186,7 +186,7 @@ fn answer_slow() -> () {
 
 
 trait Merge {
-    fn merge(&self, rhs: &Self) -> Self;
+    fn merge(self, rhs: Self) -> Self;
 }
 
 struct Birow {
@@ -198,7 +198,7 @@ struct Birow {
 }
 
 impl Merge for Birow {
-    fn merge(&self, rhs: &Self) -> Self {
+    fn merge(self, rhs: Self) -> Self {
         let shift: ILong = match (self.tail, rhs.head) {
             ((false, false), ( true,  true)) => 0,
             (( true,  true), (false, false)) => 0,
@@ -209,8 +209,8 @@ impl Merge for Birow {
             _ => -1,
         };
         let mut merged_components = HashMap::new();
-        for (key, count) in self.components.clone() {
-            for (rhs_key, rhs_count) in rhs.components.clone() {
+        for (key, count) in self.components {
+            for (rhs_key, rhs_count) in rhs.components {
                 let merged_key = (key + rhs_key) as ILong + shift;
                 let e = merged_components.entry(merged_key as ULong).or_insert(0);
                 *e += count * rhs_count;
@@ -229,6 +229,21 @@ struct BirowPerm {
 
     /// List of all possible Birow instances for the particular len
     samples: Vec<Birow>,
+}
+
+impl Merge for BirowPerm {
+    fn merge(self, rhs: Self) -> Self {
+        let merged_samples = Vec::new();
+        for sample in self.samples {
+            for rhs_sample in rhs.samples {
+                merged_samples.push(sample.clone().merge(rhs_sample));
+            }
+        }
+        BirowPerm {
+            len: self.len + rhs.len,
+            samples: merged_samples,
+        }
+    }
 }
 
 fn main() -> () {
