@@ -1,3 +1,4 @@
+use std::rc::Rc;
 use std::collections::*;
 use std::io::{self, Read};
 use std::{result};
@@ -194,7 +195,7 @@ struct Birow {
     tail: (bool, bool),
 
     /// Mapping from n_components to the count
-    components: HashMap<ULong, ULong>,
+    components: Rc<HashMap<ULong, ULong>>,
 }
 
 impl Merge for Birow {
@@ -209,8 +210,8 @@ impl Merge for Birow {
             _ => -1,
         };
         let mut merged_components = HashMap::new();
-        for (key, count) in self.components.clone() {
-            for (rhs_key, rhs_count) in rhs.components.clone() {
+        for (key, count) in self.components.iter() {
+            for (rhs_key, rhs_count) in rhs.components.iter() {
                 let merged_key = (key + rhs_key) as ILong + shift;
                 let e = merged_components.entry(merged_key as ULong).or_insert(0);
                 *e += count * rhs_count;
@@ -219,7 +220,7 @@ impl Merge for Birow {
         Birow {
             head: self.head, 
             tail: rhs.tail,
-            components: merged_components,
+            components: Rc::new(merged_components),
         }
     }
 }
@@ -228,7 +229,22 @@ struct BirowPerm {
     len: usize,
 
     /// List of all possible Birow instances for the particular len
-    samples: Vec<Birow>,
+    samples: Rc<Vec<Birow>>,
+}
+
+impl Merge for BirowPerm {
+    fn merge(&self, rhs: &Self) -> Self {
+        let mut merged_samples = Vec::new();
+        for sample in self.samples.iter() {
+            for rhs_sample in rhs.samples.iter() {
+                merged_samples.push(sample.merge(rhs_sample));
+            }
+        }
+        BirowPerm {
+            len: self.len + rhs.len,
+            samples: Rc::new(merged_samples),
+        }
+    }
 }
 
 fn main() -> () {
