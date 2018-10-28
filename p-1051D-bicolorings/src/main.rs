@@ -247,11 +247,15 @@ impl Merge for BirowPerm {
     }
 }
 
+fn get_stats_slow(i: usize) -> HashMap<usize, usize> {
+    StateGenerator::new(i).map(|x| x.n_components()).fold(
+        HashMap::new(),
+        |mut acc, x| {*acc.entry(x).or_insert(0) += 1; acc},
+    )
+}
+
 fn main() -> () {
     for i in 1..10 {
-        println!("{:?}", StateGenerator::new(i).map(|x| x.n_components()).fold(
-            HashMap::new(),
-            |mut acc, x| {*acc.entry(x).or_insert(0) += 1; acc}
-        ));
+        println!("{:?}", get_stats_slow(i));
     }
 }
