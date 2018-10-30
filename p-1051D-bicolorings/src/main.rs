@@ -248,6 +248,20 @@ struct BirowPerm {
     samples: Rc<Vec<Birow>>,
 }
 
+impl BirowPerm {
+    fn new() -> Self {
+        BirowPerm {
+            len: 1,
+            samples: Rc::new(vec![
+                Birow::new((false, false)),
+                Birow::new((false,  true)),
+                Birow::new(( true, false)),
+                Birow::new(( true,  true)),
+            ]),
+        }
+    }
+}
+
 impl Merge for BirowPerm {
     fn merge(&self, rhs: &Self) -> Self {
         let mut merged_samples = Vec::new();
