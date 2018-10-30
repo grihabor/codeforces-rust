@@ -7,6 +7,7 @@ use std::{result};
 type State = Vec<bool>;
 type ILong = i64;
 type ULong = u64;
+type Counter = HashMap<usize, ULong>;
 
 #[derive(Debug)]
 struct StateGenerator {
@@ -190,12 +191,13 @@ trait Merge {
     fn merge(&self, rhs: &Self) -> Self;
 }
 
+#[derive(Debug)]
 struct Birow {
     head: (bool, bool),
     tail: (bool, bool),
 
     /// Mapping from n_components to the count
-    components: Rc<HashMap<ULong, ULong>>,
+    components: Rc<Counter>,
 }
 
 impl Birow {
@@ -229,7 +231,7 @@ impl Merge for Birow {
         for (key, count) in self.components.iter() {
             for (rhs_key, rhs_count) in rhs.components.iter() {
                 let merged_key = (key + rhs_key) as ILong + shift;
-                let e = merged_components.entry(merged_key as ULong).or_insert(0);
+                let e = merged_components.entry(merged_key as usize).or_insert(0);
                 *e += count * rhs_count;
             }
         }
@@ -260,6 +262,41 @@ impl BirowPerm {
             ]),
         }
     }
+
+    fn build(n_columns: usize) -> Self {
+        println!("{}", n_columns);
+        match n_columns {
+            0 => panic!("n_columns must be > 0, it should have been validated during argument validation"),
+            1 => BirowPerm::new(),
+            n_columns => {
+                let bp = BirowPerm::build(n_columns / 2);
+                let semiresult = bp.merge(&bp);
+                if n_columns % 2 == 1 {
+                    semiresult.merge(&BirowPerm::new())
+                } else {
+                    semiresult
+                }
+            }
+        }
+    }
+
+    fn components(&self) -> Counter {
+        self.samples.iter().fold(
+            Counter::new(),
+            |acc, x| {acc.merge(Rc::make_mut(&mut x.components.clone()))}
+        )
+    }
+}
+
+impl Merge for Counter {
+    fn merge(&self, rhs: &Self) -> Self {
+        let mut result = self.clone();
+        for (key, value) in rhs {
+            let e = result.entry(*key).or_insert(0);
+            *e += value;
+        }
+        result
+    }
 }
 
 impl Merge for BirowPerm {
@@ -277,15 +314,17 @@ impl Merge for BirowPerm {
     }
 }
 
-fn get_stats_slow(i: usize) -> HashMap<usize, usize> {
+fn get_stats_slow(i: usize) -> Counter {
     StateGenerator::new(i).map(|x| x.n_components()).fold(
-        HashMap::new(),
+        Counter::new(),
         |mut acc, x| {*acc.entry(x).or_insert(0) += 1; acc},
     )
 }
 
+fn get_answer_fast(args: Args) -> Counter {
+    BirowPerm::build(args.n_columns).components()
+}
+
 fn main() -> () {
-    for i in 1..10 {
-        println!("{:?}", get_stats_slow(i));
-    }
+    println!("{:?}", get_answer_fast(get_args().unwrap()));
 }
