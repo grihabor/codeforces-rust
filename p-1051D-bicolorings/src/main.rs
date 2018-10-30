@@ -198,6 +198,10 @@ struct Birow {
     components: Rc<HashMap<ULong, ULong>>,
 }
 
+struct Birow {
+    
+}
+
 impl Merge for Birow {
     fn merge(&self, rhs: &Self) -> Self {
         let shift: ILong = match (self.tail, rhs.head) {
@@ -232,6 +236,15 @@ struct BirowPerm {
     samples: Rc<Vec<Birow>>,
 }
 
+impl BirowPerm {
+    fn new(len: usize) -> Self {
+        BirowPerm {
+            len: len,
+            sample: Rc::new()
+        }
+    }
+}
+
 impl Merge for BirowPerm {
     fn merge(&self, rhs: &Self) -> Self {
         let mut merged_samples = Vec::new();
@@ -252,6 +265,10 @@ fn get_stats_slow(i: usize) -> HashMap<usize, usize> {
         HashMap::new(),
         |mut acc, x| {*acc.entry(x).or_insert(0) += 1; acc},
     )
+}
+
+fn get_stats_fast(i: usize) -> HashMap<usize, usize> {
+
 }
 
 fn main() -> () {
