@@ -198,6 +198,22 @@ struct Birow {
     components: Rc<HashMap<ULong, ULong>>,
 }
 
+impl Birow {
+    fn new(column: (bool, bool)) -> Birow {
+        let mut components = HashMap::new();
+        if column.0 == column.1 {
+            components.insert(2, 1);
+        } else {
+            components.insert(1, 2);
+        }
+        Birow {
+            head: column,
+            tail: column,
+            components: Rc::new(components),
+        }
+    }
+}
+
 impl Merge for Birow {
     fn merge(&self, rhs: &Self) -> Self {
         let shift: ILong = match (self.tail, rhs.head) {
