@@ -228,7 +228,7 @@ impl Merge for Birow {
             _ => -1,
         };
         //println!("{:?} - {:?}: {}", self.tail, rhs.head, shift);
-        let mut merged_components = HashMap::new();
+        let mut merged_components = Counter::new();
         for (key, count) in self.components.iter() {
             for (rhs_key, rhs_count) in rhs.components.iter() {
                 //println!("{}: {} x {}: {}", key, count, rhs_key, rhs_count);
@@ -236,7 +236,7 @@ impl Merge for Birow {
                 let merged_key = (key + rhs_key) as ILong + shift;
                 {
                     let e = merged_components.entry(merged_key as usize).or_insert(0);
-                    *e += count * rhs_count;
+                    *e = (*e + (((count % TOP) * (rhs_count % TOP)) % TOP)) % TOP;
                 }
 
                 //println!("{:?}", merged_components);
@@ -346,8 +346,9 @@ fn get_stats_fast(args: &Args) -> Counter {
     BirowPerm::build(args.n_columns).components()
 }
 
+static TOP: u64 = 998244353;
+
 fn main() -> () {
     let args = get_args().unwrap();
-    println!("slow: {:?}", get_stats_slow(&args));
-    println!("fast: {:?}", get_stats_fast(&args));
+    println!("{}", get_stats_fast(&args)[&args.n_components]);
 }
