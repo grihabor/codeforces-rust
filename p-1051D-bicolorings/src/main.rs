@@ -314,17 +314,19 @@ impl Merge for BirowPerm {
     }
 }
 
-fn get_stats_slow(i: usize) -> Counter {
-    StateGenerator::new(i).map(|x| x.n_components()).fold(
+fn get_stats_slow(args: &Args) -> Counter {
+    StateGenerator::new(args.n_columns).map(|x| x.n_components()).fold(
         Counter::new(),
         |mut acc, x| {*acc.entry(x).or_insert(0) += 1; acc},
     )
 }
 
-fn get_answer_fast(args: Args) -> Counter {
+fn get_stats_fast(args: &Args) -> Counter {
     BirowPerm::build(args.n_columns).components()
 }
 
 fn main() -> () {
-    println!("{:?}", get_answer_fast(get_args().unwrap()));
+    let args = get_args().unwrap();
+    println!("slow: {:?}", get_stats_slow(&args));
+    println!("fast: {:?}", get_stats_fast(&args));
 }
