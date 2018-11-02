@@ -204,9 +204,9 @@ impl Birow {
     fn new(column: (bool, bool)) -> Birow {
         let mut components = HashMap::new();
         if column.0 == column.1 {
-            components.insert(2, 1);
+            components.insert(1, 1);
         } else {
-            components.insert(1, 2);
+            components.insert(2, 1);
         }
         Birow {
             head: column,
@@ -227,12 +227,20 @@ impl Merge for Birow {
             (( true, false), (false,  true)) => 0,
             _ => -1,
         };
+        //println!("{:?} - {:?}: {}", self.tail, rhs.head, shift);
         let mut merged_components = HashMap::new();
         for (key, count) in self.components.iter() {
             for (rhs_key, rhs_count) in rhs.components.iter() {
+                //println!("{}: {} x {}: {}", key, count, rhs_key, rhs_count);
+
                 let merged_key = (key + rhs_key) as ILong + shift;
-                let e = merged_components.entry(merged_key as usize).or_insert(0);
-                *e += count * rhs_count;
+                {
+                    let e = merged_components.entry(merged_key as usize).or_insert(0);
+                    *e += count * rhs_count;
+                }
+
+                //println!("{:?}", merged_components);
+                //println!("");
             }
         }
         Birow {
@@ -264,7 +272,7 @@ impl BirowPerm {
     }
 
     fn build(n_columns: usize) -> Self {
-        println!("{}", n_columns);
+        //println!("BirowPerm::build({})", n_columns);
         match n_columns {
             0 => panic!("n_columns must be > 0, it should have been validated during argument validation"),
             1 => BirowPerm::new(),
@@ -281,6 +289,7 @@ impl BirowPerm {
     }
 
     fn components(&self) -> Counter {
+        //println!("Samples: {:?}", self.samples);
         self.samples.iter().fold(
             Counter::new(),
             |acc, x| {acc.merge(Rc::make_mut(&mut x.components.clone()))}
@@ -291,7 +300,7 @@ impl BirowPerm {
 impl Merge for Counter {
     fn merge(&self, rhs: &Self) -> Self {
         let mut result = self.clone();
-        for (key, value) in rhs {
+        for (key, value) in rhs.iter() {
             let e = result.entry(*key).or_insert(0);
             *e += value;
         }
@@ -301,15 +310,27 @@ impl Merge for Counter {
 
 impl Merge for BirowPerm {
     fn merge(&self, rhs: &Self) -> Self {
-        let mut merged_samples = Vec::new();
+        let mut merged_samples = HashMap::new();
         for sample in self.samples.iter() {
             for rhs_sample in rhs.samples.iter() {
-                merged_samples.push(sample.merge(rhs_sample));
+                let birow = sample.merge(rhs_sample);
+                let key = (birow.head, birow.tail);
+                let e = merged_samples.entry(key).or_insert(Rc::new(HashMap::new()));
+                *e = Rc::new((*e).merge(&birow.components));
             }
         }
+        let birows: Vec<Birow> = merged_samples.iter()
+            .map(|(key, value)| {
+                let (head, tail) = key;
+                Birow{
+                    head: *head,
+                    tail: *tail,
+                    components: Rc::clone(value),
+                }
+            }).collect();
         BirowPerm {
             len: self.len + rhs.len,
-            samples: Rc::new(merged_samples),
+            samples: Rc::new(birows),
         }
     }
 }
