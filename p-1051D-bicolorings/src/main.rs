@@ -1,3 +1,7 @@
+#![feature(test)]
+
+extern crate test;
+
 use std::rc::Rc;
 use std::collections::*;
 use std::io::{self, Read};
@@ -187,4 +191,23 @@ static TOP: u64 = 998244353;
 fn main() -> () {
     let args = get_args().unwrap();
     println!("{}", get_stats_fast(&args)[&args.n_components]);
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use test::Bencher;
+
+    #[test]
+    fn test_get_stats_fast() {
+        let args = Args {n_columns: 10, n_components: 10};
+        assert_eq!(63862, get_stats_fast(&args)[&args.n_components]);
+    }
+
+    #[bench]
+    fn bench_get_stats_fast(b: &mut Bencher) {
+        let args = Args {n_columns: 80, n_components: 80};
+        b.iter(|| get_stats_fast(&args)[&args.n_components]);
+    }
 }
