@@ -34,27 +34,35 @@ fn get_args() -> Result<Args, std::io::Error> {
     })
 }
 
+#[derive(Ord, PartialOrd, Eq, PartialEq, Debug, Clone, Copy)]
+enum Edge {
+    FF,
+    FT,
+    TF,
+    TT,
+}
+
 trait Merge {
     fn merge(&self, rhs: &Self) -> Self;
 }
 
 #[derive(Debug)]
 struct Birow {
-    head: (bool, bool),
-    tail: (bool, bool),
+    head: Edge,
+    tail: Edge,
 
     /// Mapping from n_components to the count
     components: Rc<Counter>,
 }
 
 impl Birow {
-    fn new(column: (bool, bool)) -> Birow {
+    fn new(column: Edge) -> Birow {
         let mut components = Map::new();
-        if column.0 == column.1 {
-            components.insert(1, 1);
-        } else {
-            components.insert(2, 1);
-        }
+        let n_components = match column {
+            Edge::FF | Edge::TT => 1,
+            Edge::FT | Edge::TF => 2,
+        };
+        components.insert(n_components, 1);
         Birow {
             head: column,
             tail: column,
@@ -66,12 +74,12 @@ impl Birow {
 impl Merge for Birow {
     fn merge(&self, rhs: &Self) -> Self {
         let shift: ILong = match (self.tail, rhs.head) {
-            ((false, false), ( true,  true)) => 0,
-            (( true,  true), (false, false)) => 0,
-            ((false,  true), (false,  true)) => -2,
-            (( true, false), ( true, false)) => -2,
-            ((false,  true), ( true, false)) => 0,
-            (( true, false), (false,  true)) => 0,
+            (Edge::FF, Edge::TT) => 0,
+            (Edge::TT, Edge::FF) => 0,
+            (Edge::FT, Edge::FT) => -2,
+            (Edge::TF, Edge::TF) => -2,
+            (Edge::FT, Edge::TF) => 0,
+            (Edge::TF, Edge::FT) => 0,
             _ => -1,
         };
         let mut merged_components = Counter::new();
@@ -104,10 +112,10 @@ impl BirowPerm {
         BirowPerm {
             len: 1,
             samples: Rc::new(vec![
-                Birow::new((false, false)),
-                Birow::new((false,  true)),
-                Birow::new(( true, false)),
-                Birow::new(( true,  true)),
+                Birow::new(Edge::FF),
+                Birow::new(Edge::FT),
+                Birow::new(Edge::TF),
+                Birow::new(Edge::FF),
             ]),
         }
     }
