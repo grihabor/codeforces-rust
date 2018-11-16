@@ -10,7 +10,8 @@ use std::{result};
 
 type ILong = i64;
 type ULong = u64;
-type Counter = HashMap<usize, ULong>;
+type Map<K, V> = BTreeMap<K, V>;
+type Counter = Map<usize, ULong>;
 
 
 #[derive(Debug)]
@@ -48,7 +49,7 @@ struct Birow {
 
 impl Birow {
     fn new(column: (bool, bool)) -> Birow {
-        let mut components = HashMap::new();
+        let mut components = Map::new();
         if column.0 == column.1 {
             components.insert(1, 1);
         } else {
@@ -148,12 +149,12 @@ impl Merge for Counter {
 
 impl Merge for BirowPerm {
     fn merge(&self, rhs: &Self) -> Self {
-        let mut merged_samples = HashMap::new();
+        let mut merged_samples = Map::new();
         for sample in self.samples.iter() {
             for rhs_sample in rhs.samples.iter() {
                 let birow = sample.merge(rhs_sample);
                 let key = (birow.head, birow.tail);
-                let e = merged_samples.entry(key).or_insert(Rc::new(HashMap::new()));
+                let e = merged_samples.entry(key).or_insert(Rc::new(Map::new()));
                 *e = Rc::new((*e).merge(&birow.components));
             }
         }
