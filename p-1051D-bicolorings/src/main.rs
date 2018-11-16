@@ -111,7 +111,7 @@ impl BirowPerm {
                 Birow::new(Edge::FF),
                 Birow::new(Edge::FT),
                 Birow::new(Edge::TF),
-                Birow::new(Edge::FF),
+                Birow::new(Edge::TT),
             ]),
         }
     }
