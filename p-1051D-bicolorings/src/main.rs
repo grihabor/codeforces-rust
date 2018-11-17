@@ -66,7 +66,7 @@ impl std::convert::Into<Edge> for usize {
 }
 
 trait Merge {
-    fn merge(&self, rhs: &Self) -> Self;
+    fn merge(&self, rhs: &Self, n_components: Option<usize>) -> Self;
 }
 
 #[derive(Debug)]
@@ -95,7 +95,7 @@ impl Birow {
 }
 
 impl Merge for Birow {
-    fn merge(&self, rhs: &Self) -> Self {
+    fn merge(&self, rhs: &Self, n_components: Option<usize>) -> Self {
         let shift: ILong = match (self.tail, rhs.head) {
             (Edge::FF, Edge::TT) => 0,
             (Edge::TT, Edge::FF) => 0,
@@ -109,6 +109,11 @@ impl Merge for Birow {
         for (key, count) in self.components.iter() {
             for (rhs_key, rhs_count) in rhs.components.iter() {
                 let merged_key = (key + rhs_key) as ILong + shift;
+                if let Some(threshold) = n_components {
+                    if merged_key > (threshold as i64) {
+                        continue
+                    }
+                }
                 {
                     let e = merged_components.entry(merged_key as usize).or_insert(0);
                     *e = (*e + (((count % TOP) * (rhs_count % TOP)) % TOP)) % TOP;
@@ -158,15 +163,15 @@ impl BirowPerm {
         }
     }
 
-    fn build(n_columns: usize) -> Self {
+    fn build(n_columns: usize, n_components: Option<usize>) -> Self {
         match n_columns {
             0 => panic!("n_columns must be > 0, it should have been validated during argument validation"),
             1 => BirowPerm::new(),
             n_columns => {
-                let bp = BirowPerm::build(n_columns / 2);
-                let semiresult = bp.merge(&bp);
+                let bp = BirowPerm::build(n_columns / 2, n_components);
+                let semiresult = bp.merge(&bp, n_components);
                 if n_columns % 2 == 1 {
-                    semiresult.merge(&BirowPerm::new())
+                    semiresult.merge(&BirowPerm::new(), n_components)
                 } else {
                     semiresult
                 }
@@ -177,13 +182,16 @@ impl BirowPerm {
     fn components(&self) -> Counter {
         self.samples.iter().fold(
             Counter::new(),
-            |acc, x| {acc.merge(Rc::make_mut(&mut x.components.clone()))}
+            |acc, x| {acc.merge(
+                Rc::make_mut(&mut x.components.clone()), 
+                None,
+            )}
         )
     }
 }
 
 impl Merge for Counter {
-    fn merge(&self, rhs: &Self) -> Self {
+    fn merge(&self, rhs: &Self, n_components: Option<usize>) -> Self {
         let mut result = self.clone();
         for (key, value) in rhs.iter() {
             let e = result.entry(*key).or_insert(0);
@@ -210,7 +218,7 @@ fn index_to_tail(index: usize) -> Edge {
 }
 
 impl Merge for BirowPerm {
-    fn merge(&self, rhs: &Self) -> Self {
+    fn merge(&self, rhs: &Self, n_components: Option<usize>) -> Self {
         let mut merged_samples = Vec::with_capacity(16);
         for _ in 0..16 {
             merged_samples.push(Counter::new())
@@ -218,10 +226,10 @@ impl Merge for BirowPerm {
         assert_eq!(16, merged_samples.len());
         for sample in self.samples.iter() {
             for rhs_sample in rhs.samples.iter() {
-                let birow = sample.merge(rhs_sample);
+                let birow = sample.merge(rhs_sample, n_components);
                 let index = head_tail_to_index(birow.head, birow.tail);
                 let e = &mut merged_samples[index];
-                *e = (*e).merge(&birow.components);
+                *e = (*e).merge(&birow.components, n_components);
             }
         }
         let birows: Vec<Birow> = merged_samples.iter()
@@ -242,7 +250,14 @@ impl Merge for BirowPerm {
 }
 
 fn get_stats_fast(args: &Args) -> Counter {
-    BirowPerm::build(args.n_columns).components()
+    BirowPerm::build(args.n_columns, None).components()
+}
+
+fn get_stats_super_fast(args: &Args) -> u64 {
+    BirowPerm::build(
+        args.n_columns, 
+        Some(args.n_components),
+    ).components()[&args.n_components]
 }
 
 static TOP: u64 = 998244353;
@@ -257,6 +272,8 @@ fn main() -> () {
 mod tests {
     use super::*;
     use test::Bencher;
+
+    // Tests for get_stats_fast
 
     #[test]
     fn test_get_stats_fast_10_10() {
@@ -294,9 +311,55 @@ mod tests {
         assert_eq!(5872, get_stats_fast(&args)[&args.n_components]);
     }
 
+    // Tests for get_stats_super_fast
+
+    #[test]
+    fn test_get_stats_super_fast_10_10() {
+        let args = Args {n_columns: 10, n_components: 10};
+        assert_eq!(63862, get_stats_super_fast(&args));
+    }
+
+    #[test]
+    fn test_get_stats_super_fast_9_10() {
+        let args = Args {n_columns: 9, n_components: 10};
+        assert_eq!(9676, get_stats_super_fast(&args));
+    }
+
+    #[test]
+    fn test_get_stats_super_fast_8_10() {
+        let args = Args {n_columns: 8, n_components: 10};
+        assert_eq!(1206, get_stats_super_fast(&args));
+    }
+
+    #[test]
+    fn test_get_stats_super_fast_9_9() {
+        let args = Args {n_columns: 9, n_components: 9};
+        assert_eq!(18946, get_stats_super_fast(&args));
+    }
+
+    #[test]
+    fn test_get_stats_super_fast_8_9() {
+        let args = Args {n_columns: 8, n_components: 9};
+        assert_eq!(2928, get_stats_super_fast(&args));
+    }
+
+    #[test]
+    fn test_get_stats_super_fast_8_8() {
+        let args = Args {n_columns: 8, n_components: 8};
+        assert_eq!(5872, get_stats_super_fast(&args));
+    }
+
+    // Bench
+
     #[bench]
     fn bench_get_stats_fast(b: &mut Bencher) {
         let args = Args {n_columns: 80, n_components: 80};
         b.iter(|| get_stats_fast(&args)[&args.n_components]);
+    }
+
+    #[bench]
+    fn bench_get_stats_super_fast(b: &mut Bencher) {
+        let args = Args {n_columns: 80, n_components: 80};
+        b.iter(|| get_stats_super_fast(&args));
     }
 }
