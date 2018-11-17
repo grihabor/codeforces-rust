@@ -127,19 +127,34 @@ struct BirowPerm {
     len: usize,
 
     /// List of all possible Birow instances for the particular len
-    samples: Rc<Vec<Birow>>,
+    samples: Vec<Birow>,
 }
 
 impl BirowPerm {
     fn new() -> Self {
         BirowPerm {
             len: 1,
-            samples: Rc::new(vec![
+            samples: vec![
                 Birow::new(Edge::FF),
+                Birow {head: Edge::FF, tail: Edge::FT, components: Rc::new(Map::new())},
+                Birow {head: Edge::FF, tail: Edge::TF, components: Rc::new(Map::new())},
+                Birow {head: Edge::FF, tail: Edge::TT, components: Rc::new(Map::new())},
+
+                Birow {head: Edge::FT, tail: Edge::FF, components: Rc::new(Map::new())},
                 Birow::new(Edge::FT),
+                Birow {head: Edge::FT, tail: Edge::TF, components: Rc::new(Map::new())},
+                Birow {head: Edge::FT, tail: Edge::TT, components: Rc::new(Map::new())},
+
+                Birow {head: Edge::TF, tail: Edge::FF, components: Rc::new(Map::new())},
+                Birow {head: Edge::TF, tail: Edge::FT, components: Rc::new(Map::new())},
                 Birow::new(Edge::TF),
+                Birow {head: Edge::TF, tail: Edge::TT, components: Rc::new(Map::new())},
+
+                Birow {head: Edge::TT, tail: Edge::FF, components: Rc::new(Map::new())},
+                Birow {head: Edge::TT, tail: Edge::FT, components: Rc::new(Map::new())},
+                Birow {head: Edge::TT, tail: Edge::TF, components: Rc::new(Map::new())},
                 Birow::new(Edge::TT),
-            ]),
+            ],
         }
     }
 
@@ -196,27 +211,11 @@ fn index_to_tail(index: usize) -> Edge {
 
 impl Merge for BirowPerm {
     fn merge(&self, rhs: &Self) -> Self {
-        let mut merged_samples: [Counter; 16] = [
-            Counter::new(),
-            Counter::new(),
-            Counter::new(),
-            Counter::new(),
-
-            Counter::new(),
-            Counter::new(),
-            Counter::new(),
-            Counter::new(),
-
-            Counter::new(),
-            Counter::new(),
-            Counter::new(),
-            Counter::new(),
-
-            Counter::new(),
-            Counter::new(),
-            Counter::new(),
-            Counter::new(),
-        ];
+        let mut merged_samples = Vec::with_capacity(16);
+        for _ in 0..16 {
+            merged_samples.push(Counter::new())
+        }
+        assert_eq!(16, merged_samples.len());
         for sample in self.samples.iter() {
             for rhs_sample in rhs.samples.iter() {
                 let birow = sample.merge(rhs_sample);
@@ -237,7 +236,7 @@ impl Merge for BirowPerm {
             }).collect();
         BirowPerm {
             len: self.len + rhs.len,
-            samples: Rc::new(birows),
+            samples: birows,
         }
     }
 }
