@@ -200,9 +200,39 @@ mod tests {
     use test::Bencher;
 
     #[test]
-    fn test_get_stats_fast() {
+    fn test_get_stats_fast_10_10() {
         let args = Args {n_columns: 10, n_components: 10};
         assert_eq!(63862, get_stats_fast(&args)[&args.n_components]);
+    }
+
+    #[test]
+    fn test_get_stats_fast_9_10() {
+        let args = Args {n_columns: 9, n_components: 10};
+        assert_eq!(9676, get_stats_fast(&args)[&args.n_components]);
+    }
+
+    #[test]
+    fn test_get_stats_fast_8_10() {
+        let args = Args {n_columns: 8, n_components: 10};
+        assert_eq!(1206, get_stats_fast(&args)[&args.n_components]);
+    }
+
+    #[test]
+    fn test_get_stats_fast_9_9() {
+        let args = Args {n_columns: 9, n_components: 9};
+        assert_eq!(18946, get_stats_fast(&args)[&args.n_components]);
+    }
+
+    #[test]
+    fn test_get_stats_fast_8_9() {
+        let args = Args {n_columns: 8, n_components: 9};
+        assert_eq!(2928, get_stats_fast(&args)[&args.n_components]);
+    }
+
+    #[test]
+    fn test_get_stats_fast_8_8() {
+        let args = Args {n_columns: 8, n_components: 8};
+        assert_eq!(5872, get_stats_fast(&args)[&args.n_components]);
     }
 
     #[bench]
