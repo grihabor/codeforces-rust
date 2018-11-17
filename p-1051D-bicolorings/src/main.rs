@@ -42,6 +42,29 @@ enum Edge {
     TT,
 }
 
+impl std::convert::Into<usize> for Edge {
+    fn into(self) -> usize {
+        match self {
+            Edge::FF => 0,
+            Edge::FT => 1,
+            Edge::TF => 2,
+            Edge::TT => 3,
+        }
+    }
+}
+
+impl std::convert::Into<Edge> for usize {
+    fn into(self) -> Edge {
+        match self {
+            0 => Edge::FF,
+            1 => Edge::FT,
+            2 => Edge::TF,
+            3 => Edge::TT,
+            _ => panic!("Failed to convert usize to Edge")
+        }
+    }
+}
+
 trait Merge {
     fn merge(&self, rhs: &Self) -> Self;
 }
@@ -155,24 +178,61 @@ impl Merge for Counter {
     }
 }
 
+fn head_tail_to_index(head: Edge, tail: Edge) -> usize {
+    let head_id: usize = head.into();
+    let tail_id: usize = tail.into();
+    head_id << 2 | tail_id
+}
+
+fn index_to_head(index: usize) -> Edge {
+    let id = index >> 2;
+    id.into()
+}
+
+fn index_to_tail(index: usize) -> Edge {
+    let id = index % 4;
+    id.into()
+}
+
 impl Merge for BirowPerm {
     fn merge(&self, rhs: &Self) -> Self {
-        let mut merged_samples = Map::new();
+        let mut merged_samples: [Counter; 16] = [
+            Counter::new(),
+            Counter::new(),
+            Counter::new(),
+            Counter::new(),
+
+            Counter::new(),
+            Counter::new(),
+            Counter::new(),
+            Counter::new(),
+
+            Counter::new(),
+            Counter::new(),
+            Counter::new(),
+            Counter::new(),
+
+            Counter::new(),
+            Counter::new(),
+            Counter::new(),
+            Counter::new(),
+        ];
         for sample in self.samples.iter() {
             for rhs_sample in rhs.samples.iter() {
                 let birow = sample.merge(rhs_sample);
-                let key = (birow.head, birow.tail);
-                let e = merged_samples.entry(key).or_insert(Rc::new(Map::new()));
-                *e = Rc::new((*e).merge(&birow.components));
+                let index = head_tail_to_index(birow.head, birow.tail);
+                let e = &mut merged_samples[index];
+                *e = (*e).merge(&birow.components);
             }
         }
         let birows: Vec<Birow> = merged_samples.iter()
-            .map(|(key, value)| {
-                let (head, tail) = key;
-                Birow{
-                    head: *head,
-                    tail: *tail,
-                    components: Rc::clone(value),
+            .enumerate()
+            .map(|(index, value)| {
+                let (head, tail) = (index_to_head(index), index_to_tail(index));
+                Birow {
+                    head: head,
+                    tail: tail,
+                    components: Rc::new(value.clone()),
                 }
             }).collect();
         BirowPerm {
