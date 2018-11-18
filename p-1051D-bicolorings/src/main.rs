@@ -249,6 +249,59 @@ impl Merge for BirowPerm {
     }
 }
 
+#[derive(Debug)]
+struct Power {
+    x: u64,
+    y: u64,
+}
+
+struct Layer {
+    powers: Vec<Power>,
+}
+
+impl Layer {
+    fn new() -> Self {
+        Layer {
+            powers: vec![
+                Power {x: 1, y: 0},
+                Power {x: 0, y: 1},
+            ]
+        }
+    }
+
+    fn next(self) -> Self {
+        let mut next_powers: Vec<Power> = Vec::with_capacity(self.powers.len() + 2);
+        for _ in 0..(self.powers.len() + 2) {
+            next_powers.push(Power{x: 0, y: 0});
+        }
+        for (i, power) in self.powers.iter().enumerate() {
+            next_powers[i].x += power.x + 2 * power.y;
+            next_powers[i].y += power.y;
+            next_powers[i + 1].x += power.x;
+            next_powers[i + 1].y += 2 * power.x;
+            next_powers[i + 2].y += power.y;
+        };
+        for power in next_powers.iter_mut() {
+            power.x %= TOP;
+            power.y %= TOP;
+        }
+        Layer{ powers: next_powers }
+    }
+
+    fn build(n: usize) -> Self {
+        let mut layer = Layer::new();
+        for _ in 1..n {
+            layer = layer.next();
+        }
+        layer
+    }
+
+    fn get_case_count(&self, n_components: usize) -> u64 {
+        let power = &self.powers[n_components - 1];
+        (2 * (power.x + power.y)) % TOP
+    }
+}
+
 fn get_stats_fast(args: &Args) -> Counter {
     BirowPerm::build(args.n_columns, None).components()
 }
@@ -260,11 +313,25 @@ fn get_stats_super_fast(args: &Args) -> u64 {
     ).components()[&args.n_components]
 }
 
+fn get_stats_quadratic(args: &Args) -> u64 {
+    Layer::build(args.n_columns).get_case_count(args.n_components)
+}
+
 static TOP: u64 = 998244353;
 
 fn main() -> () {
     let args = get_args().unwrap();
-    println!("{}", get_stats_fast(&args)[&args.n_components]);
+    println!("{:?}", Layer::build(args.n_columns).powers);
+    println!("{}", get_stats_quadratic(&args));
+    println!("");
+
+    let stats = get_stats_fast(&args);
+    let samples = BirowPerm::build(args.n_columns, None).samples;
+    for sample in samples {
+        // println!("{:?}", sample);
+    }
+    println!("{:?}", stats);
+    println!("{:?}", stats[&args.n_components]);
 }
 
 
@@ -349,8 +416,53 @@ mod tests {
         assert_eq!(5872, get_stats_super_fast(&args));
     }
 
+    // Tests for get_stats_quadratic
+
+    #[test]
+    fn test_get_stats_quadratic_10_10() {
+        let args = Args {n_columns: 10, n_components: 10};
+        assert_eq!(63862, get_stats_quadratic(&args));
+    }
+
+    #[test]
+    fn test_get_stats_quadratic_9_10() {
+        let args = Args {n_columns: 9, n_components: 10};
+        assert_eq!(9676, get_stats_quadratic(&args));
+    }
+
+    #[test]
+    fn test_get_stats_quadratic_8_10() {
+        let args = Args {n_columns: 8, n_components: 10};
+        assert_eq!(1206, get_stats_quadratic(&args));
+    }
+
+    #[test]
+    fn test_get_stats_quadratic_9_9() {
+        let args = Args {n_columns: 9, n_components: 9};
+        assert_eq!(18946, get_stats_quadratic(&args));
+    }
+
+    #[test]
+    fn test_get_stats_quadratic_8_9() {
+        let args = Args {n_columns: 8, n_components: 9};
+        assert_eq!(2928, get_stats_quadratic(&args));
+    }
+
+    #[test]
+    fn test_get_stats_quadratic_8_8() {
+        let args = Args {n_columns: 8, n_components: 8};
+        assert_eq!(5872, get_stats_quadratic(&args));
+    }
+
+
     // Bench
 
+    #[bench]
+    fn bench_get_stats_quadratic(b: &mut Bencher) {
+        let args = Args {n_columns: 80, n_components: 80};
+        b.iter(|| get_stats_quadratic(&args));
+    }
+    
     #[bench]
     fn bench_get_stats_fast(b: &mut Bencher) {
         let args = Args {n_columns: 80, n_components: 80};
@@ -362,4 +474,5 @@ mod tests {
         let args = Args {n_columns: 80, n_components: 80};
         b.iter(|| get_stats_super_fast(&args));
     }
+    
 }
