@@ -1,6 +1,6 @@
-#![feature(test)]
+// #![feature(test)]
 
-extern crate test;
+// extern crate test;
 
 use std::rc::Rc;
 use std::collections::*;
@@ -321,24 +321,14 @@ static TOP: u64 = 998244353;
 
 fn main() -> () {
     let args = get_args().unwrap();
-    println!("{:?}", Layer::build(args.n_columns).powers);
     println!("{}", get_stats_quadratic(&args));
-    println!("");
-
-    let stats = get_stats_fast(&args);
-    let samples = BirowPerm::build(args.n_columns, None).samples;
-    for sample in samples {
-        // println!("{:?}", sample);
-    }
-    println!("{:?}", stats);
-    println!("{:?}", stats[&args.n_components]);
 }
 
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use test::Bencher;
+    // use test::Bencher;
 
     // Tests for get_stats_fast
 
@@ -456,7 +446,7 @@ mod tests {
 
 
     // Bench
-
+    /*
     #[bench]
     fn bench_get_stats_quadratic(b: &mut Bencher) {
         let args = Args {n_columns: 80, n_components: 80};
@@ -474,5 +464,5 @@ mod tests {
         let args = Args {n_columns: 80, n_components: 80};
         b.iter(|| get_stats_super_fast(&args));
     }
-    
+    */
 }
