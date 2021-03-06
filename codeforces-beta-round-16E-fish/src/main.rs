@@ -1,15 +1,30 @@
 use std::collections::hash_map::IntoIter;
 use std::collections::HashMap;
+use std::fmt;
 use std::io;
 use std::io::Read;
 use std::ops::{Shl, Sub};
 
-#[derive(Debug)]
+#[derive(Copy, Clone, Eq, PartialEq, Hash)]
 struct FishSet(u32);
 
 impl FishSet {
     fn new(n: u32) -> Self {
         Self((1 << n) - 1)
+    }
+}
+
+impl fmt::Debug for FishSet {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("{")?;
+        f.write_str(
+            &self
+                .into_iter()
+                .map(|f| format!("{:?}", f))
+                .collect::<Vec<String>>()
+                .join(","),
+        )?;
+        f.write_str("}")
     }
 }
 
@@ -38,7 +53,7 @@ impl FishSetIter {
     }
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 struct Fish(u32);
 
 impl Iterator for FishSetIter {
@@ -61,17 +76,26 @@ impl Iterator for FishSetIter {
     }
 }
 
-struct WinProbability(HashMap<(usize, FishSet), f64>);
-
+struct WinProbability(HashMap<Member, f64>);
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+struct Member {
+    fish: Fish,
+    set: FishSet,
+}
 impl WinProbability {
     fn new() -> Self {
         Self(HashMap::new())
     }
 
-    fn get(&mut self, i: usize, set: FishSet) -> f64 {
-        // if let Some(probability) = self.0.get(&(i, set)) {
-        //     return probability.clone()
-        // }
+    fn get(&mut self, member: Member) -> f64 {
+        if let Some(probability) = self.0.get(&member) {
+            return probability.clone();
+        }
+        // let subset = member.set - member.fish;
+        // subset.into_iter().map(|fish| {
+        //     let member = Member{fish, set: subset};
+        //     self.get(member)
+        // }).fold(0, )
         0.
     }
 }
@@ -80,28 +104,36 @@ fn main() {
     let mut input = String::new();
     io::stdin().read_line(&mut input).expect("read n failed");
     let n = input.trim().parse().expect("failed to parse n");
-    let probabilities = (0..n)
-        .map(|i| {
-            input.clear();
-            io::stdin()
-                .read_line(&mut input)
-                .expect(&format!("failed to read line {}", i));
-            input
-                .split(" ")
-                .map(|v| {
-                    v.trim()
-                        .parse::<f64>()
-                        .expect(&format!("failed to parse value: {}", v))
-                })
-                .collect()
-        })
-        .collect::<Vec<Vec<f64>>>();
+    let probabilities = HashMap::new();
+    for i in 0..n {
+        input.clear();
+        io::stdin()
+            .read_line(&mut input)
+            .expect(&format!("failed to read line {}", i));
+        let row = input.split(" ").map(|v| {
+            v.trim()
+                .parse::<f64>()
+                .expect(&format!("failed to parse value: {}", v))
+        });
+        for (j, probability) in row.enumerate() {
+            let member = Member {
+                fish: Fish(i),
+                set: Fish(i) + Fish(j.into()),
+            };
+            probabilities[member] = probability
+        }
+    }
 
-    // let memoized = WinProbability::new();
-    // (0..n).map(|i| {
-    //     memoized.get()
-    // })
-    print!("{:?} {:?}", FishSet::new(n), probabilities);
+    let mut memoized = WinProbability::new();
+    for i in 0..n {
+        let member = Member {
+            fish: Fish(i),
+            set: FishSet::new(n),
+        };
+        let probability = memoized.get();
+        println!("{}", probability)
+    }
+    // print!("{:?} {:?}", FishSet::new(n), probabilities);
 }
 
 mod tests {
