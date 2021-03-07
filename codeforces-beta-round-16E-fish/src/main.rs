@@ -1,11 +1,12 @@
 use std::collections::hash_map::IntoIter;
 use std::collections::HashMap;
+use std::convert;
 use std::convert::TryInto;
 use std::fmt;
 use std::io;
 use std::io::Read;
 use std::ops;
-use std::ops::Add;
+use std::ops::{Add, Index};
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash)]
 struct FishSet(u32);
@@ -17,6 +18,16 @@ impl FishSet {
 
     fn pair(x: Fish, y: Fish) -> Self {
         FishSet(0) + x + y
+    }
+
+    fn array(&self) -> ([Fish; 18], usize) {
+        let mut fish_vec = [Fish(0); 18];
+        let fish_vec_len = self
+            .into_iter()
+            .enumerate()
+            .map(|(i, fish)| fish_vec[i] = fish)
+            .count();
+        return (fish_vec, fish_vec_len);
     }
 }
 
@@ -99,13 +110,55 @@ impl Iterator for FishSetIter {
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 struct WinSetFish<SetBits, FishBits>(u32, SetBits, FishBits);
 
+struct FishPair {
+    winner: Fish,
+    looser: Fish,
+}
+
+impl<SetBits, FishBits> convert::TryInto<FishPair> for WinSetFish<SetBits, FishBits>
+where
+    SetBits: U32 + Default,
+    FishBits: U32 + Default,
+{
+    type Error = ();
+
+    fn try_into(self) -> Result<FishPair, ()> {
+        let (arr, len) = self.set().array();
+        if len == 2 {
+            let winner = self.fish();
+            Ok(FishPair {
+                winner,
+                looser: if arr[0] == winner { arr[1] } else { arr[0] },
+            })
+        } else {
+            Err(())
+        }
+    }
+}
+
+impl FishPair {
+    fn new(winner: Fish, looser: Fish) -> Self {
+        FishPair { winner, looser }
+    }
+}
+
+impl<SetBits, FishBits> convert::From<FishPair> for WinSetFish<SetBits, FishBits>
+where
+    SetBits: U32 + Default,
+    FishBits: U32 + Default,
+{
+    fn from(pair: FishPair) -> Self {
+        WinSetFish::new(pair.winner, FishSet::pair(pair.winner, pair.looser))
+    }
+}
+
 impl<SetBits, FishBits> WinSetFish<SetBits, FishBits>
 where
     SetBits: U32 + Default,
     FishBits: U32 + Default,
 {
     fn pair(winner: Fish, looser: Fish) -> Self {
-        WinSetFish::new(winner, FishSet::pair(winner, looser))
+        FishPair { winner, looser }.into()
     }
 
     fn new(fish: Fish, set: FishSet) -> Self {
@@ -182,12 +235,46 @@ where
     }
 }
 
+#[derive(Debug)]
+struct Matrix<T> {
+    data: Vec<T>,
+    width: u32,
+}
+
+impl<T> Matrix<T>
+where
+    T: Default + Clone,
+{
+    fn new(height: u32, width: u32) -> Self {
+        Matrix {
+            width,
+            data: vec![T::default(); (width * height) as usize],
+        }
+    }
+}
+
+impl<T> ops::Index<(u32, u32)> for Matrix<T> {
+    type Output = T;
+
+    fn index(&self, index: (u32, u32)) -> &Self::Output {
+        &self.data[(index.0 * self.width + index.1) as usize]
+    }
+}
+
+impl<T> ops::IndexMut<(u32, u32)> for Matrix<T> {
+    fn index_mut(&mut self, index: (u32, u32)) -> &mut Self::Output {
+        &mut self.data[(index.0 * self.width + index.1) as usize]
+    }
+}
+
 type Float = f64;
 
 type WinProbability = WinProbabilityGeneric<Const18, Const5>;
 
+impl WinProbability {}
+
 #[derive(Debug)]
-struct WinProbabilityGeneric<SetBits, FishBits>(Vec<Float>, SetBits, FishBits);
+struct WinProbabilityGeneric<SetBits, FishBits>(Vec<Float>, Matrix<Float>, SetBits, FishBits);
 
 impl<SetBits, FishBits> WinProbabilityGeneric<SetBits, FishBits>
 where
@@ -197,17 +284,22 @@ where
     fn new() -> Self {
         WinProbabilityGeneric(
             vec![-1.; 1 << (SetBits::u32() + FishBits::u32())],
+            Matrix::new(SetBits::u32(), SetBits::u32()),
             SetBits::default(),
             FishBits::default(),
         )
     }
 
-    fn insert(&mut self, win: Win, probability: Float) {
+    fn insert_set(&mut self, win: Win, probability: Float) {
         self.0[win.0 as usize] = probability;
     }
 
     fn get(&self, target: Win) -> Option<Float> {
-        let probability = self.0[target.0 as usize];
+        let probability = if let Ok(pair) = target.try_into() {
+            self.wins_pair(pair)
+        } else {
+            self.0[target.0 as usize]
+        };
         if probability < 0. {
             None
         } else {
@@ -215,7 +307,7 @@ where
         }
     }
 
-    fn wins(&mut self, target: Win) -> Float {
+    fn wins_set(&mut self, target: Win) -> Float {
         if let Some(probability) = self.get(target) {
             return probability;
         }
@@ -235,8 +327,32 @@ where
             })
             .sum::<Float>()
             / branch_count;
-        self.insert(target.clone(), result);
+        self.insert_set(target.clone(), result);
         result
+    }
+
+    fn wins(&mut self, target: Win) -> Float {
+        if let Ok(pair) = target.try_into() {
+            self.wins_pair(pair)
+        } else {
+            self.wins_set(target)
+        }
+    }
+
+    fn wins_pair(&self, pair: FishPair) -> Float {
+        self.1[(pair.winner.0, pair.looser.0)]
+    }
+
+    fn insert(&mut self, win: Win, probability: Float) {
+        if let Ok(pair) = win.try_into() {
+            self.insert_pair(pair, probability)
+        } else {
+            self.insert_set(win, probability)
+        }
+    }
+
+    fn insert_pair(&mut self, pair: FishPair, probability: Float) {
+        self.1[(pair.winner.0, pair.looser.0)] = probability
     }
 }
 
@@ -365,6 +481,25 @@ mod tests {
     }
 
     #[test]
+    fn win_probability_zeros() {
+        let mut proba = WinProbability::new();
+        proba.insert(Win::pair(Fish(0), Fish(1)), 1.0);
+        proba.insert(Win::pair(Fish(1), Fish(0)), 0.0);
+        proba.insert(Win::pair(Fish(0), Fish(2)), 1.0);
+        proba.insert(Win::pair(Fish(2), Fish(0)), 0.0);
+        proba.insert(Win::pair(Fish(1), Fish(2)), 0.5);
+        proba.insert(Win::pair(Fish(2), Fish(1)), 0.5);
+
+        let actual: Vec<String> = (0..3)
+            .map(|i| proba.wins(Win::new(Fish(i), FishSet::new(3))))
+            .map(fmt_float)
+            .collect();
+
+        let expected = vec!["1.000000", "0.000000", "0.000000"];
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
     fn large() {
         let n = 18;
         let mut proba = WinProbability::new();
@@ -381,25 +516,6 @@ mod tests {
             .collect();
 
         let expected: Vec<String> = (0..n).map(|_| fmt_float(1. / (n as Float))).collect();
-        assert_eq!(actual, expected);
-    }
-
-    #[test]
-    fn win_probability_zeros() {
-        let mut proba = WinProbability::new();
-        proba.insert(Win::pair(Fish(0), Fish(1)), 1.0);
-        proba.insert(Win::pair(Fish(1), Fish(0)), 0.0);
-        proba.insert(Win::pair(Fish(0), Fish(2)), 1.0);
-        proba.insert(Win::pair(Fish(2), Fish(0)), 0.0);
-        proba.insert(Win::pair(Fish(1), Fish(2)), 0.5);
-        proba.insert(Win::pair(Fish(2), Fish(1)), 0.5);
-
-        let actual: Vec<String> = (0..3)
-            .map(|i| proba.wins(Win::new(Fish(i), FishSet::new(3))))
-            .map(fmt_float)
-            .collect();
-
-        let expected = vec!["1.000000", "0.000000", "0.000000"];
         assert_eq!(actual, expected);
     }
 }
