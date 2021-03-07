@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::convert::TryInto;
 use std::fmt;
 use std::io;
-use std::io::Read;
+use std::io::{stdin, BufRead, Read};
 use std::ops;
 use std::ops::Add;
 
@@ -15,8 +15,19 @@ impl FishSet {
         Self((1 << n) - 1)
     }
 
+    fn empty() -> Self {
+        Self(0)
+    }
+
     fn pair(x: Fish, y: Fish) -> Self {
-        FishSet(0) + x + y
+        FishSet::empty() + x + y
+    }
+
+    fn array(&self, arr: &mut [Fish; 18]) -> usize {
+        self.into_iter()
+            .enumerate()
+            .map(|(i, fish)| arr[i] = fish)
+            .count()
     }
 }
 
@@ -245,13 +256,51 @@ fn to_float(x: usize) -> Float {
     x.try_into().unwrap()
 }
 
+fn permutations(k: u32, n: u32) -> Vec<FishSet> {
+    _permutations(FishSet::empty(), k, n, 0)
+}
+
+fn _permutations(set: FishSet, k: u32, n: u32, start: u32) -> Vec<FishSet> {
+    let mut arr = Vec::new();
+    for fish in (start..n).map(|i| Fish(i)) {
+        let new_set = set + fish;
+        if new_set == set {
+            continue;
+        }
+        if k >= 2 {
+            arr.extend(_permutations(new_set, k - 1, n, fish.0))
+        } else {
+            arr.push(new_set)
+        }
+    }
+    arr
+}
+
+fn prepare(memoized: &mut WinProbability, n: u32) {
+    let mut fish_buffer = [Fish(0); 18];
+    for k in 3..n - 1 {
+        for set in permutations(k, n) {
+            let len = set.array(&mut fish_buffer);
+
+            let probability_sum = (0..len - 1)
+                .map(|i| memoized.wins(Win::new(fish_buffer[i], set)))
+                .sum::<Float>();
+
+            // we can skip the calculation of the last probability
+            // because it must be equal 1.-sum_of_other_probabilities
+            memoized.insert(Win::new(fish_buffer[len - 1], set), 1. - probability_sum)
+        }
+    }
+}
+
 fn main() {
     let mut buffer = String::new();
     io::stdin().read_line(&mut buffer).expect("read n failed");
     let n = buffer.trim().parse().expect("failed to parse n");
     // let n = 4;
     let memoized = WinProbability::new();
-    let mut memoized = read_probabilities(&mut buffer, n, memoized);
+    let mut memoized = read_probabilities(&mut io::stdin().lock(), &mut buffer, n, memoized);
+    prepare(&mut memoized, n);
 
     // println!("{:?}", memoized);
     for i in 0..n {
@@ -263,14 +312,18 @@ fn main() {
     // println!("{:?}", memoized);
 }
 
-fn read_probabilities(
+fn read_probabilities<S>(
+    stream: &mut S,
     buffer: &mut String,
     n: u32,
     mut probabilities: WinProbability,
-) -> WinProbability {
+) -> WinProbability
+where
+    S: BufRead,
+{
     for i in 0..n {
         buffer.clear();
-        io::stdin()
+        stream
             .read_line(buffer)
             .expect(&format!("failed to read line {}", i));
         let row = buffer.split(" ").map(|v| {
@@ -280,7 +333,7 @@ fn read_probabilities(
         });
         for (j, probability) in row.enumerate() {
             let j = j.try_into().unwrap();
-            let win = Win::new(Fish(i), FishSet(0) + Fish(i) + Fish(j));
+            let win = Win::new(Fish(i), FishSet::empty() + Fish(i) + Fish(j));
             probabilities.insert(win, probability);
         }
     }
@@ -292,10 +345,45 @@ fn fmt_float(x: Float) -> String {
 }
 
 mod tests {
-    use crate::{fmt_float, Fish, FishSet, FishSetIter, Float, Win, WinProbability};
+    use crate::{
+        fmt_float, permutations, prepare, Fish, FishSet, FishSetIter, Float, Win, WinProbability,
+    };
     use std::collections::HashMap;
     use std::convert::TryInto;
     use std::num::NonZeroI32;
+
+    #[test]
+    fn permutations_2_3() {
+        assert_eq!(
+            permutations(2, 3),
+            vec![
+                FishSet::empty() + Fish(0) + Fish(1),
+                FishSet::empty() + Fish(0) + Fish(2),
+                FishSet::empty() + Fish(1) + Fish(2),
+            ]
+        )
+    }
+
+    #[test]
+    fn permutations_3_3() {
+        assert_eq!(
+            permutations(3, 3),
+            vec![FishSet::empty() + Fish(0) + Fish(1) + Fish(2),]
+        )
+    }
+
+    #[test]
+    fn permutations_3_4() {
+        assert_eq!(
+            permutations(3, 4),
+            vec![
+                FishSet::empty() + Fish(0) + Fish(1) + Fish(2),
+                FishSet::empty() + Fish(0) + Fish(1) + Fish(3),
+                FishSet::empty() + Fish(0) + Fish(2) + Fish(3),
+                FishSet::empty() + Fish(1) + Fish(2) + Fish(3),
+            ]
+        )
+    }
 
     #[test]
     fn iter_fish_set_all() {
@@ -334,72 +422,69 @@ mod tests {
         }
     }
 
+    fn get_result<F>(n: u32, f: F) -> Vec<String>
+    where
+        F: Fn(&mut WinProbability) -> (),
+    {
+        let mut proba = WinProbability::new();
+        f(&mut proba);
+        prepare(&mut proba, n);
+
+        (0..n)
+            .map(|i| proba.wins(Win::new(Fish(i), FishSet::new(n))))
+            .map(fmt_float)
+            .collect()
+    }
+
     #[test]
     fn equal_probability_2() {
-        let mut proba = WinProbability::new();
-        proba.insert(Win::pair(Fish(0), Fish(1)), 0.5);
-        proba.insert(Win::pair(Fish(1), Fish(0)), 0.5);
-        for i in 0..2 {
-            let actual = proba.wins(Win::new(Fish(i), FishSet::new(2)));
-            assert_eq!(fmt_float(actual), "0.500000");
-        }
+        let proba = get_result(2, |proba| {
+            proba.insert(Win::pair(Fish(0), Fish(1)), 0.5);
+            proba.insert(Win::pair(Fish(1), Fish(0)), 0.5);
+        });
+        assert_eq!(proba, vec!["0.500000", "0.500000"]);
     }
 
     #[test]
     fn win_probability() {
-        let mut proba = WinProbability::new();
-        proba.insert(Win::pair(Fish(0), Fish(1)), 0.5);
-        proba.insert(Win::pair(Fish(1), Fish(0)), 0.5);
-        proba.insert(Win::pair(Fish(0), Fish(2)), 0.4);
-        proba.insert(Win::pair(Fish(2), Fish(0)), 0.6);
-        proba.insert(Win::pair(Fish(1), Fish(2)), 0.3);
-        proba.insert(Win::pair(Fish(2), Fish(1)), 0.7);
-
-        let actual: Vec<String> = (0..3)
-            .map(|i| proba.wins(Win::new(Fish(i), FishSet::new(3))))
-            .map(fmt_float)
-            .collect();
-
+        let actual = get_result(3, |proba| {
+            proba.insert(Win::pair(Fish(0), Fish(1)), 0.5);
+            proba.insert(Win::pair(Fish(1), Fish(0)), 0.5);
+            proba.insert(Win::pair(Fish(0), Fish(2)), 0.4);
+            proba.insert(Win::pair(Fish(2), Fish(0)), 0.6);
+            proba.insert(Win::pair(Fish(1), Fish(2)), 0.3);
+            proba.insert(Win::pair(Fish(2), Fish(1)), 0.7);
+        });
         let expected = vec!["0.276667", "0.226667", "0.496667"];
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn win_probability_zeros() {
+        let mut actual = get_result(3, |proba| {
+            proba.insert(Win::pair(Fish(0), Fish(1)), 1.0);
+            proba.insert(Win::pair(Fish(1), Fish(0)), 0.0);
+            proba.insert(Win::pair(Fish(0), Fish(2)), 1.0);
+            proba.insert(Win::pair(Fish(2), Fish(0)), 0.0);
+            proba.insert(Win::pair(Fish(1), Fish(2)), 0.5);
+            proba.insert(Win::pair(Fish(2), Fish(1)), 0.5);
+        });
+        let expected = vec!["1.000000", "0.000000", "0.000000"];
         assert_eq!(actual, expected);
     }
 
     #[test]
     fn large() {
         let n = 18;
-        let mut proba = WinProbability::new();
-        for i in 0..n {
-            for j in 0..n {
-                let val = if i == j { 0.0 } else { 0.5 };
-                proba.insert(Win::pair(Fish(i), Fish(j)), val);
+        let actual = get_result(n, |proba| {
+            for i in 0..n {
+                for j in 0..n {
+                    let val = if i == j { 0.0 } else { 0.5 };
+                    proba.insert(Win::pair(Fish(i), Fish(j)), val);
+                }
             }
-        }
-
-        let actual: Vec<String> = (0..n)
-            .map(|i| proba.wins(Win::new(Fish(i), FishSet::new(n))))
-            .map(fmt_float)
-            .collect();
-
+        });
         let expected: Vec<String> = (0..n).map(|_| fmt_float(1. / (n as Float))).collect();
-        assert_eq!(actual, expected);
-    }
-
-    #[test]
-    fn win_probability_zeros() {
-        let mut proba = WinProbability::new();
-        proba.insert(Win::pair(Fish(0), Fish(1)), 1.0);
-        proba.insert(Win::pair(Fish(1), Fish(0)), 0.0);
-        proba.insert(Win::pair(Fish(0), Fish(2)), 1.0);
-        proba.insert(Win::pair(Fish(2), Fish(0)), 0.0);
-        proba.insert(Win::pair(Fish(1), Fish(2)), 0.5);
-        proba.insert(Win::pair(Fish(2), Fish(1)), 0.5);
-
-        let actual: Vec<String> = (0..3)
-            .map(|i| proba.wins(Win::new(Fish(i), FishSet::new(3))))
-            .map(fmt_float)
-            .collect();
-
-        let expected = vec!["1.000000", "0.000000", "0.000000"];
         assert_eq!(actual, expected);
     }
 }
