@@ -96,10 +96,11 @@ impl Iterator for FishSetIter {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 struct Win(u32);
 
 static FISH_MAX: u32 = 18;
+static FISH_BITS: u32 = 5;
 
 impl Win {
     fn pair(winner: Fish, looser: Fish) -> Self {
@@ -121,21 +122,32 @@ impl Win {
     }
 }
 
+// type Probability = f64;
+
 #[derive(Debug)]
-struct WinProbability(HashMap<Win, f64>);
+struct WinProbability(Vec<f64>);
 
 impl WinProbability {
     fn new() -> Self {
-        WinProbability(HashMap::new())
+        WinProbability(vec![-1.; 1 << (FISH_MAX + FISH_BITS)])
     }
 
     fn insert(&mut self, win: Win, probability: f64) {
-        self.0.insert(win, probability);
+        self.0[win.0 as usize] = probability;
+    }
+
+    fn get(&self, target: Win) -> Option<f64> {
+        let probability = self.0[target.0 as usize];
+        if probability < 0. {
+            None
+        } else {
+            Some(probability)
+        }
     }
 
     fn wins(&mut self, target: Win) -> f64 {
-        if let Some(probability) = self.0.get(&target) {
-            return probability.clone();
+        if let Some(probability) = self.get(target) {
+            return probability;
         }
 
         let m = target.set().into_iter().count();
@@ -153,7 +165,7 @@ impl WinProbability {
             })
             .sum::<f64>()
             / branch_count;
-        self.0.insert(target, result);
+        self.insert(target.clone(), result);
         result
     }
 }
@@ -239,45 +251,42 @@ mod tests {
 
     #[test]
     fn equal_probability_3() {
-        let mut proba = HashMap::new();
+        let mut proba = WinProbability::new();
         proba.insert(Win::pair(Fish(0), Fish(1)), 0.5);
         proba.insert(Win::pair(Fish(1), Fish(0)), 0.5);
         proba.insert(Win::pair(Fish(0), Fish(2)), 0.5);
         proba.insert(Win::pair(Fish(2), Fish(0)), 0.5);
         proba.insert(Win::pair(Fish(1), Fish(2)), 0.5);
         proba.insert(Win::pair(Fish(2), Fish(1)), 0.5);
-        let mut probabilities = WinProbability(proba);
         for i in 0..3 {
-            let actual = probabilities.wins(Win::new(Fish(i), FishSet::new(3)));
+            let actual = proba.wins(Win::new(Fish(i), FishSet::new(3)));
             assert_eq!(fmt_f64(actual), "0.333333");
         }
     }
 
     #[test]
     fn equal_probability_2() {
-        let mut proba = HashMap::new();
+        let mut proba = WinProbability::new();
         proba.insert(Win::pair(Fish(0), Fish(1)), 0.5);
         proba.insert(Win::pair(Fish(1), Fish(0)), 0.5);
-        let mut probabilities = WinProbability(proba);
         for i in 0..2 {
-            let actual = probabilities.wins(Win::new(Fish(i), FishSet::new(2)));
+            let actual = proba.wins(Win::new(Fish(i), FishSet::new(2)));
             assert_eq!(fmt_f64(actual), "0.500000");
         }
     }
 
     #[test]
     fn win_probability() {
-        let mut proba = HashMap::new();
+        let mut proba = WinProbability::new();
         proba.insert(Win::pair(Fish(0), Fish(1)), 0.5);
         proba.insert(Win::pair(Fish(1), Fish(0)), 0.5);
         proba.insert(Win::pair(Fish(0), Fish(2)), 0.4);
         proba.insert(Win::pair(Fish(2), Fish(0)), 0.6);
         proba.insert(Win::pair(Fish(1), Fish(2)), 0.3);
         proba.insert(Win::pair(Fish(2), Fish(1)), 0.7);
-        let mut probabilities = WinProbability(proba);
 
         let actual: Vec<String> = (0..3)
-            .map(|i| probabilities.wins(Win::new(Fish(i), FishSet::new(3))))
+            .map(|i| proba.wins(Win::new(Fish(i), FishSet::new(3))))
             .map(fmt_f64)
             .collect();
 
@@ -288,7 +297,7 @@ mod tests {
     #[test]
     fn large() {
         let n = 14;
-        let mut proba = HashMap::new();
+        let mut proba = WinProbability::new();
         for i in 0..n {
             for j in 0..n {
                 let val = if i == j { 0.0 } else { 0.5 };
@@ -296,9 +305,8 @@ mod tests {
             }
         }
 
-        let mut probabilities = WinProbability(proba);
         let actual: Vec<String> = (0..n)
-            .map(|i| probabilities.wins(Win::new(Fish(i), FishSet::new(n))))
+            .map(|i| proba.wins(Win::new(Fish(i), FishSet::new(n))))
             .map(fmt_f64)
             .collect();
 
@@ -308,17 +316,16 @@ mod tests {
 
     #[test]
     fn win_probability_zeros() {
-        let mut proba = HashMap::new();
+        let mut proba = WinProbability::new();
         proba.insert(Win::pair(Fish(0), Fish(1)), 1.0);
         proba.insert(Win::pair(Fish(1), Fish(0)), 0.0);
         proba.insert(Win::pair(Fish(0), Fish(2)), 1.0);
         proba.insert(Win::pair(Fish(2), Fish(0)), 0.0);
         proba.insert(Win::pair(Fish(1), Fish(2)), 0.5);
         proba.insert(Win::pair(Fish(2), Fish(1)), 0.5);
-        let mut probabilities = WinProbability(proba);
 
         let actual: Vec<String> = (0..3)
-            .map(|i| probabilities.wins(Win::new(Fish(i), FishSet::new(3))))
+            .map(|i| proba.wins(Win::new(Fish(i), FishSet::new(3))))
             .map(fmt_f64)
             .collect();
 
