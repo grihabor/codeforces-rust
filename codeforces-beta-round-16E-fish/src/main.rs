@@ -97,39 +97,109 @@ impl Iterator for FishSetIter {
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
-struct Win(u32);
+struct WinSetFish<SetBits, FishBits>(u32, SetBits, FishBits);
 
-static FISH_MAX: u32 = 18;
-static FISH_BITS: u32 = 5;
-
-impl Win {
+impl<SetBits, FishBits> WinSetFish<SetBits, FishBits>
+where
+    SetBits: U32 + Default,
+    FishBits: U32 + Default,
+{
     fn pair(winner: Fish, looser: Fish) -> Self {
-        Win::new(winner, FishSet::pair(winner, looser))
+        WinSetFish::new(winner, FishSet::pair(winner, looser))
     }
 
     fn new(fish: Fish, set: FishSet) -> Self {
-        let ones = (1 << FISH_MAX) - 1;
-        Win(fish.0 << FISH_MAX | set.0 & ones)
+        let ones = (1 << FishBits::u32()) - 1;
+        WinSetFish(
+            set.0 << FishBits::u32() | fish.0 & ones,
+            SetBits::default(),
+            FishBits::default(),
+        )
     }
 
     fn fish(&self) -> Fish {
-        Fish(self.0 >> FISH_MAX)
+        let ones = (1 << FishBits::u32()) - 1;
+        Fish(self.0 & ones)
     }
 
     fn set(&self) -> FishSet {
-        let ones = (1 << FISH_MAX) - 1;
+        FishSet(self.0 >> FishBits::u32())
+    }
+}
+
+trait U32 {
+    fn u32() -> u32;
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+struct Const18;
+impl U32 for Const18 {
+    #[inline(always)]
+    fn u32() -> u32 {
+        18
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+struct Const5;
+impl U32 for Const5 {
+    #[inline(always)]
+    fn u32() -> u32 {
+        5
+    }
+}
+
+type Win = WinSetFish<Const18, Const5>;
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
+struct WinFishSet<SetBits, FishBits>(u32, SetBits, FishBits);
+
+impl<SetBits, FishBits> WinFishSet<SetBits, FishBits>
+where
+    SetBits: U32 + Default,
+    FishBits: U32 + Default,
+{
+    fn pair(winner: Fish, looser: Fish) -> Self {
+        WinFishSet::new(winner, FishSet::pair(winner, looser))
+    }
+
+    fn new(fish: Fish, set: FishSet) -> Self {
+        let ones = (1 << SetBits::u32()) - 1;
+        WinFishSet(
+            fish.0 << SetBits::u32() | set.0 & ones,
+            SetBits::default(),
+            FishBits::default(),
+        )
+    }
+
+    fn fish(&self) -> Fish {
+        Fish(self.0 >> SetBits::u32())
+    }
+
+    fn set(&self) -> FishSet {
+        let ones = (1 << SetBits::u32()) - 1;
         FishSet(self.0 & ones)
     }
 }
 
 type Float = f64;
 
-#[derive(Debug)]
-struct WinProbability(Vec<Float>);
+type WinProbability = WinProbabilityGeneric<Const18, Const5>;
 
-impl WinProbability {
+#[derive(Debug)]
+struct WinProbabilityGeneric<SetBits, FishBits>(Vec<Float>, SetBits, FishBits);
+
+impl<SetBits, FishBits> WinProbabilityGeneric<SetBits, FishBits>
+where
+    SetBits: U32 + Default,
+    FishBits: U32 + Default,
+{
     fn new() -> Self {
-        WinProbability(vec![-1.; 1 << (FISH_MAX + FISH_BITS)])
+        WinProbabilityGeneric(
+            vec![-1.; 1 << (SetBits::u32() + FishBits::u32())],
+            SetBits::default(),
+            FishBits::default(),
+        )
     }
 
     fn insert(&mut self, win: Win, probability: Float) {
@@ -187,7 +257,7 @@ fn main() {
     for i in 0..n {
         let member = Win::new(Fish(i), FishSet::new(n));
         let probability = memoized.wins(member);
-        print!("{} ", fmt_Probability(probability));
+        print!("{} ", fmt_float(probability));
     }
     // println!();
     // println!("{:?}", memoized);
@@ -217,12 +287,12 @@ fn read_probabilities(
     probabilities
 }
 
-fn fmt_Probability(x: Float) -> String {
+fn fmt_float(x: Float) -> String {
     return format!("{:.6}", x);
 }
 
 mod tests {
-    use crate::{fmt_Probability, Fish, FishSet, FishSetIter, Float, Win, WinProbability};
+    use crate::{fmt_float, Fish, FishSet, FishSetIter, Float, Win, WinProbability};
     use std::collections::HashMap;
     use std::convert::TryInto;
     use std::num::NonZeroI32;
@@ -260,7 +330,7 @@ mod tests {
         proba.insert(Win::pair(Fish(2), Fish(1)), 0.5);
         for i in 0..3 {
             let actual = proba.wins(Win::new(Fish(i), FishSet::new(3)));
-            assert_eq!(fmt_Probability(actual), "0.333333");
+            assert_eq!(fmt_float(actual), "0.333333");
         }
     }
 
@@ -271,7 +341,7 @@ mod tests {
         proba.insert(Win::pair(Fish(1), Fish(0)), 0.5);
         for i in 0..2 {
             let actual = proba.wins(Win::new(Fish(i), FishSet::new(2)));
-            assert_eq!(fmt_Probability(actual), "0.500000");
+            assert_eq!(fmt_float(actual), "0.500000");
         }
     }
 
@@ -287,7 +357,7 @@ mod tests {
 
         let actual: Vec<String> = (0..3)
             .map(|i| proba.wins(Win::new(Fish(i), FishSet::new(3))))
-            .map(fmt_Probability)
+            .map(fmt_float)
             .collect();
 
         let expected = vec!["0.276667", "0.226667", "0.496667"];
@@ -307,10 +377,10 @@ mod tests {
 
         let actual: Vec<String> = (0..n)
             .map(|i| proba.wins(Win::new(Fish(i), FishSet::new(n))))
-            .map(fmt_Probability)
+            .map(fmt_float)
             .collect();
 
-        let expected: Vec<String> = (0..n).map(|_| fmt_Probability(1. / (n as Float))).collect();
+        let expected: Vec<String> = (0..n).map(|_| fmt_float(1. / (n as Float))).collect();
         assert_eq!(actual, expected);
     }
 
@@ -326,7 +396,7 @@ mod tests {
 
         let actual: Vec<String> = (0..3)
             .map(|i| proba.wins(Win::new(Fish(i), FishSet::new(3))))
-            .map(fmt_Probability)
+            .map(fmt_float)
             .collect();
 
         let expected = vec!["1.000000", "0.000000", "0.000000"];
