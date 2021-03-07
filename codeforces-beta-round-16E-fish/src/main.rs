@@ -122,21 +122,21 @@ impl Win {
     }
 }
 
-// type Probability = f64;
+type Float = f64;
 
 #[derive(Debug)]
-struct WinProbability(Vec<f64>);
+struct WinProbability(Vec<Float>);
 
 impl WinProbability {
     fn new() -> Self {
         WinProbability(vec![-1.; 1 << (FISH_MAX + FISH_BITS)])
     }
 
-    fn insert(&mut self, win: Win, probability: f64) {
+    fn insert(&mut self, win: Win, probability: Float) {
         self.0[win.0 as usize] = probability;
     }
 
-    fn get(&self, target: Win) -> Option<f64> {
+    fn get(&self, target: Win) -> Option<Float> {
         let probability = self.0[target.0 as usize];
         if probability < 0. {
             None
@@ -145,33 +145,33 @@ impl WinProbability {
         }
     }
 
-    fn wins(&mut self, target: Win) -> f64 {
+    fn wins(&mut self, target: Win) -> Float {
         if let Some(probability) = self.get(target) {
             return probability;
         }
 
         let m = target.set().into_iter().count();
-        let branch_count = to_f64(m * (m - 1) / 2);
+        let branch_count = to_float(m * (m - 1) / 2);
 
         let result = (target.set() - target.fish())
             .into_iter()
-            .map(|first_looser: Fish| -> f64 {
+            .map(|first_looser: Fish| -> Float {
                 let survivors = target.set() - first_looser;
                 survivors
                     .into_iter()
                     .map(|first_winner| self.wins(Win::pair(first_winner, first_looser)))
-                    .sum::<f64>()
+                    .sum::<Float>()
                     * self.wins(Win::new(target.fish(), survivors))
             })
-            .sum::<f64>()
+            .sum::<Float>()
             / branch_count;
         self.insert(target.clone(), result);
         result
     }
 }
 
-fn to_f64(x: usize) -> f64 {
-    let x: i32 = x.try_into().unwrap();
+fn to_float(x: usize) -> Float {
+    let x: u16 = x.try_into().unwrap();
     x.try_into().unwrap()
 }
 
@@ -187,7 +187,7 @@ fn main() {
     for i in 0..n {
         let member = Win::new(Fish(i), FishSet::new(n));
         let probability = memoized.wins(member);
-        print!("{} ", fmt_f64(probability));
+        print!("{} ", fmt_Probability(probability));
     }
     // println!();
     // println!("{:?}", memoized);
@@ -205,7 +205,7 @@ fn read_probabilities(
             .expect(&format!("failed to read line {}", i));
         let row = buffer.split(" ").map(|v| {
             v.trim()
-                .parse::<f64>()
+                .parse::<Float>()
                 .expect(&format!("failed to parse value: {}", v))
         });
         for (j, probability) in row.enumerate() {
@@ -217,12 +217,12 @@ fn read_probabilities(
     probabilities
 }
 
-fn fmt_f64(x: f64) -> String {
+fn fmt_Probability(x: Float) -> String {
     return format!("{:.6}", x);
 }
 
 mod tests {
-    use crate::{fmt_f64, Fish, FishSet, FishSetIter, Win, WinProbability};
+    use crate::{fmt_Probability, Fish, FishSet, FishSetIter, Float, Win, WinProbability};
     use std::collections::HashMap;
     use std::convert::TryInto;
     use std::num::NonZeroI32;
@@ -260,7 +260,7 @@ mod tests {
         proba.insert(Win::pair(Fish(2), Fish(1)), 0.5);
         for i in 0..3 {
             let actual = proba.wins(Win::new(Fish(i), FishSet::new(3)));
-            assert_eq!(fmt_f64(actual), "0.333333");
+            assert_eq!(fmt_Probability(actual), "0.333333");
         }
     }
 
@@ -271,7 +271,7 @@ mod tests {
         proba.insert(Win::pair(Fish(1), Fish(0)), 0.5);
         for i in 0..2 {
             let actual = proba.wins(Win::new(Fish(i), FishSet::new(2)));
-            assert_eq!(fmt_f64(actual), "0.500000");
+            assert_eq!(fmt_Probability(actual), "0.500000");
         }
     }
 
@@ -287,7 +287,7 @@ mod tests {
 
         let actual: Vec<String> = (0..3)
             .map(|i| proba.wins(Win::new(Fish(i), FishSet::new(3))))
-            .map(fmt_f64)
+            .map(fmt_Probability)
             .collect();
 
         let expected = vec!["0.276667", "0.226667", "0.496667"];
@@ -296,7 +296,7 @@ mod tests {
 
     #[test]
     fn large() {
-        let n = 14;
+        let n = 18;
         let mut proba = WinProbability::new();
         for i in 0..n {
             for j in 0..n {
@@ -307,10 +307,10 @@ mod tests {
 
         let actual: Vec<String> = (0..n)
             .map(|i| proba.wins(Win::new(Fish(i), FishSet::new(n))))
-            .map(fmt_f64)
+            .map(fmt_Probability)
             .collect();
 
-        let expected: Vec<String> = (0..n).map(|_| fmt_f64(1. / (n as f64))).collect();
+        let expected: Vec<String> = (0..n).map(|_| fmt_Probability(1. / (n as Float))).collect();
         assert_eq!(actual, expected);
     }
 
@@ -326,7 +326,7 @@ mod tests {
 
         let actual: Vec<String> = (0..3)
             .map(|i| proba.wins(Win::new(Fish(i), FishSet::new(3))))
-            .map(fmt_f64)
+            .map(fmt_Probability)
             .collect();
 
         let expected = vec!["1.000000", "0.000000", "0.000000"];
