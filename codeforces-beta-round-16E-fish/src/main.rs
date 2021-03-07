@@ -149,7 +149,7 @@ impl U32 for Const5 {
     }
 }
 
-type Win = WinSetFish<Const18, Const5>;
+type Win = WinFishSet<Const18, Const5>;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 struct WinFishSet<SetBits, FishBits>(u32, SetBits, FishBits);
