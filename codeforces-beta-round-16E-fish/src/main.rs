@@ -120,21 +120,21 @@ where
     }
 
     fn new(fish: Fish, set: FishSet) -> Self {
-        let ones = (1 << FishBits::u32()) - 1;
+        let fish_mask = (1 << FishBits::u32()) - 1;
         WinSetFish(
-            set.0 << FishBits::u32() | fish.0 & ones,
+            CompressedFishSet::new(set, fish).0 << FishBits::u32() | fish.0 & fish_mask,
             SetBits::default(),
             FishBits::default(),
         )
     }
 
     fn fish(&self) -> Fish {
-        let ones = (1 << FishBits::u32()) - 1;
-        Fish(self.0 & ones)
+        let mask = (1 << FishBits::u32()) - 1;
+        Fish(self.0 & mask)
     }
 
     fn set(&self) -> FishSet {
-        FishSet(self.0 >> FishBits::u32())
+        CompressedFishSet(self.0 >> FishBits::u32()).decompress(self.fish())
     }
 }
 
@@ -160,14 +160,34 @@ impl U32 for Const5 {
     }
 }
 
-type Win = WinFishSet<Const18, Const5>;
+type Win = WinSetFish<Const18, Const5>;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 struct WinFishSet<SetBits, FishBits>(u32, SetBits, FishBits);
 
-impl<SetBits, FishBits> WinFishSet<SetBits, FishBits>
+struct CompressedFishSet(u32);
+
+impl CompressedFishSet {
+    fn new(set: FishSet, fish: Fish) -> Self {
+        let high_mask = u32::max_value() << (fish.0 + 1);
+        let high = set.0 & high_mask;
+        let low_mask = !(u32::max_value() << fish.0);
+        let low = set.0 & low_mask;
+        CompressedFishSet(high >> 1 | low)
+    }
+
+    fn decompress(self, fish: Fish) -> FishSet {
+        let high_mask = u32::max_value() << fish.0;
+        let high = self.0 & high_mask;
+        let low_mask = !high_mask;
+        let low = self.0 & low_mask;
+        FishSet(high << 1 | 1 << fish.0 | low)
+    }
+}
+
+impl<FishCount, FishBits> WinFishSet<FishCount, FishBits>
 where
-    SetBits: U32 + Default,
+    FishCount: U32 + Default,
     FishBits: U32 + Default,
 {
     fn pair(winner: Fish, looser: Fish) -> Self {
@@ -175,21 +195,27 @@ where
     }
 
     fn new(fish: Fish, set: FishSet) -> Self {
-        let ones = (1 << SetBits::u32()) - 1;
+        let compressed = CompressedFishSet::new(set, fish);
+        let set_mask = (1 << Self::set_bits()) - 1;
         WinFishSet(
-            fish.0 << SetBits::u32() | set.0 & ones,
-            SetBits::default(),
+            fish.0 << Self::set_bits() | compressed.0 & set_mask,
+            FishCount::default(),
             FishBits::default(),
         )
     }
 
+    fn set_bits() -> u32 {
+        FishCount::u32() - 1
+    }
+
     fn fish(&self) -> Fish {
-        Fish(self.0 >> SetBits::u32())
+        Fish(self.0 >> Self::set_bits())
     }
 
     fn set(&self) -> FishSet {
-        let ones = (1 << SetBits::u32()) - 1;
-        FishSet(self.0 & ones)
+        let mask = (1 << Self::set_bits()) - 1;
+        let compressed = CompressedFishSet(self.0 & mask);
+        compressed.decompress(self.fish())
     }
 }
 
@@ -346,7 +372,8 @@ fn fmt_float(x: Float) -> String {
 
 mod tests {
     use crate::{
-        fmt_float, permutations, prepare, Fish, FishSet, FishSetIter, Float, Win, WinProbability,
+        fmt_float, permutations, prepare, CompressedFishSet, Fish, FishSet, FishSetIter, Float,
+        Win, WinProbability,
     };
     use std::collections::HashMap;
     use std::convert::TryInto;
@@ -405,6 +432,41 @@ mod tests {
         assert_eq!(it.next().unwrap(), Fish(2));
         assert_eq!(it.next().unwrap(), Fish(4));
         assert_eq!(it.next(), None);
+    }
+
+    #[test]
+    fn decompress_set_234() {
+        let set = FishSet::empty() + Fish(2) + Fish(3) + Fish(4);
+        let compressed = CompressedFishSet::new(set, Fish(3));
+        let decompressed = compressed.decompress(Fish(3));
+        assert_eq!(decompressed, set)
+    }
+
+    #[test]
+    fn decompress_set_1367() {
+        let set = FishSet::empty() + Fish(1) + Fish(3) + Fish(6) + Fish(7);
+        let compressed = CompressedFishSet::new(set, Fish(6));
+        let decompressed = compressed.decompress(Fish(6));
+        assert_eq!(decompressed, set)
+    }
+
+    #[test]
+    fn decompress_set_02() {
+        let set = FishSet::empty() + Fish(0) + Fish(2);
+        let compressed = CompressedFishSet::new(set, Fish(0));
+        assert_eq!(compressed.0, 0b10);
+        let decompressed = compressed.decompress(Fish(0));
+        assert_eq!(decompressed, set)
+    }
+
+    #[test]
+    fn decompress_set_permutations() {
+        for set in permutations(2, 3) {
+            let fish = set.into_iter().next().unwrap();
+            let compressed = CompressedFishSet::new(set, fish);
+            let decompressed = compressed.decompress(fish);
+            assert_eq!(decompressed, set, "set: {:?}, fish: {:?}", set, fish)
+        }
     }
 
     #[test]
